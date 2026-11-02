@@ -21,7 +21,7 @@ destructors then run in the reverse order of construction, interleaved
 with atexit() functions, as C++ requires; before, they ran from
 __DTOR_LIST__ after every atexit() function.
 
-libnix provides __cxa_atexit and __dso_handle (openamigagcc
+libnix provides __cxa_atexit and __dso_handle (gfopengcc
 patches/libnix/0005); this patch needs it. -fno-use-cxa-atexit turns
 the old way back on.
 ---
@@ -39,7 +39,7 @@ index 51b9ee119..6cf034acd 100644
 +	# GFOpenAmigaGCC: -fuse-cxa-atexit by default. GCC then registers every
 +	# static and thread_local destructor (__cxa_atexit, __cxa_thread_atexit);
 +	# without it a thread_local's destructor never runs. libnix provides
-+	# __cxa_atexit and __dso_handle (openamigagcc patches/libnix/0005).
++	# __cxa_atexit and __dso_handle (gfopengcc patches/libnix/0005).
 +	default_use_cxa_atexit=yes
  	CFLAGS="-Os"
    	case ${enable_threads} in

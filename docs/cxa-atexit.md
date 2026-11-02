@@ -1,11 +1,11 @@
 # C++: thread_local destructors run by default (-fuse-cxa-atexit)
 
 **Patches:** `patches/gcc/0010-amigaos-fuse-cxa-atexit-by-default-thread_local-dest.patch`, `patches/libnix/0005-__cxa_atexit-and-__dso_handle-C-destructors-register.patch`
-**Test:** `tests/cxx/dtors.cpp` (on the Amiga), and amigachrome-stoves' t12, t13 and t19
+**Test:** `tests/cxx/dtors.cpp` (on the Amiga), and amicradle-stoves' t12, t13 and t19
 
 ## Symptom
 
-A plain `m68k-amigaos-g++` build never ran the destructor of a `thread_local` object declared at namespace scope or as a static data member. Not when its thread ended, and not at exit for the main program's own object. amigachrome-stoves' qualification tests t12, t13 and t19 count constructions and destructions and failed: t13 reported "100 constructed, 0 destroyed", t19 "0 of 1150". Built with `-fuse-cxa-atexit` and a `__dso_handle` of the test's own (t12c, t13c, t19c) they passed.
+A plain `m68k-amigaos-g++` build never ran the destructor of a `thread_local` object declared at namespace scope or as a static data member. Not when its thread ended, and not at exit for the main program's own object. amicradle-stoves' qualification tests t12, t13 and t19 count constructions and destructions and failed: t13 reported "100 constructed, 0 destroyed", t19 "0 of 1150". Built with `-fuse-cxa-atexit` and a `__dso_handle` of the test's own (t12c, t13c, t19c) they passed.
 
 A `thread_local` inside a function was not affected.
 
@@ -38,7 +38,7 @@ The hook remains an option if a C library other than libnix has to be supported.
 
 ## Results
 
-Lab `cxx`, a copy of Instance-32 (AmigaOS 3.2.3, Kickstart 47.115), 12 October 2026. The stove tests are built by amigachrome-stoves' `os32-gcc16/tests/build-tests.sh` and run by its `run-tests`; t8 and t9 were not built (no openamigatls checkout). `dtors.cpp` is built as `tests/cxx/README.md` says:
+Lab `cxx`, a copy of Instance-32 (AmigaOS 3.2.3, Kickstart 47.115), 12 October 2026. The stove tests are built by amicradle-stoves' `os32-gcc16/tests/build-tests.sh` and run by its `run-tests`; t8 and t9 were not built (no gfopentls checkout). `dtors.cpp` is built as `tests/cxx/README.md` says:
 
 | Test | Live stove | Stove copy with the patches | Full rebuild |
 | --- | --- | --- | --- |

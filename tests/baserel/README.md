@@ -1,7 +1,7 @@
 # Base-relative C++ repro (os32-gcc16)
 
 `build.sh` builds `t3_threads.cpp` plain, with `-fbaserel32` and with `-fbaserel`.
-Seen on daletop on 12 October 2026 (stove from openamigagcc main f9efa3d, AmigaOS 3.2.3 lab, AC090 68040):
+Seen on daletop on 12 October 2026 (stove from gfopengcc main f9efa3d, AmigaOS 3.2.3 lab, AC090 68040):
 
 | Build | Link | On the Amiga |
 | --- | --- | --- |
@@ -11,7 +11,7 @@ Seen on daletop on 12 October 2026 (stove from openamigagcc main f9efa3d, AmigaO
 
 The `LDFCM` sections are not FPU constants: they are 4-byte pointers to exception typeinfo, which `.gcc_except_table` reaches with a 32-bit PC-relative relocation across hunks (see `FINDINGS.md`, B). GCC 0011 fixes that (below).
 
-With libnix 0007, aros-stuff 0005 and the base-relative `libos32compat` builds (amigachrome-stoves #7: `compat/libb`, `compat/libb32`), `-fbaserel32` and `-fbaserel` both print `t3 OK`. `build.sh` links each variant with the matching compat archive.
+With libnix 0007, aros-stuff 0005 and the base-relative `libos32compat` builds (amicradle-stoves #7: `compat/libb`, `compat/libb32`), `-fbaserel32` and `-fbaserel` both print `t3 OK`. `build.sh` links each variant with the matching compat archive.
 
 ## Catch by type (GCC 0011)
 

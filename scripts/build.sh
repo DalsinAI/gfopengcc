@@ -110,7 +110,7 @@ for f in bin/m68k-amigaos-gprof m68k-amigaos/ndk-include/exec/types.h m68k-amiga
   [ -e "$PREFIX/$f" ] || { echo "the amiga-gcc build did not install $f (see $LOGS/make.log and $WORK/log)"; exit 1; }
 done
 
-# 5b. libamiga.a, from GFOpenNDK (projects/openamigasdk, pinned in
+# 5b. libamiga.a, from GFOpenNDK (projects/gfopensdk, pinned in
 #     scripts/sources.lock), in every multilib folder, each built with that
 #     multilib's own flags: "libm020/libm881;@mcpu=68020@m68881" gets
 #     -mcpu=68020 -m68881, "libb;@fbaserel" -fbaserel. GFOpenNDK's lib/build.sh puts
@@ -119,7 +119,7 @@ done
 #     removed first, so a link to it (a stove's) is replaced, never written
 #     through. docs/openndk-libamiga.md.
 say "libamiga.a from GFOpenNDK"
-OPENNDK=$WORK/projects/openamigasdk/OpenNDK
+OPENNDK=$WORK/projects/gfopensdk/OpenNDK
 T=$PREFIX/m68k-amigaos
 "$PREFIX/bin/m68k-amigaos-gcc" -print-multi-lib | while IFS=';' read -r dir flags; do
   fl=${flags//@/ -}
@@ -230,7 +230,7 @@ m68kdis() { # CPU LIB: "object/address S|I" for every word objdump shows
 done
 printf '#include <proto/exec.h>\n#include <clib/alib_protos.h>\nint main(void) { struct List l; NewList(&l); return IsListEmpty(&l) ? 0 : 1; }\n' > "$C/alib.c"
 "$CC" -m68040 -O2 -I"$OPENNDK/Include_H" -o "$C/alib" "$C/alib.c" -Wl,-Map,"$C/alib.map"
-grep -q 'openamigasdk/OpenNDK\|libamiga.a(newlist.o)' "$C/alib.map" || { echo "a NewList program did not link GFOpenNDK's libamiga.a"; exit 1; }
+grep -q 'gfopensdk/OpenNDK\|libamiga.a(newlist.o)' "$C/alib.map" || { echo "a NewList program did not link GFOpenNDK's libamiga.a"; exit 1; }
 echo "libamiga.a: $n copies, all GFOpenNDK's; every multilib links its own"
 echo "defaults: $("$CC" -### -c -x c /dev/null 2>&1 | grep -o -- '-fno-[a-z-]*' | sort -u | tr '\n' ' ')"
 echo "GFOpenAmigaGCC built in $PREFIX"

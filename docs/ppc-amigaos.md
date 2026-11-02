@@ -6,16 +6,16 @@ it is not part of 16.2.0-open2 or any other release here yet.
 
 ## Where it is now
 
-- **The recipe:** amigachrome-stoves' `os4-gcc16/`
-  ([amigachrome-stoves #8](https://github.com/DalsinAI/amigachrome-stoves/pull/8),
+- **The recipe:** amicradle-stoves' `os4-gcc16/`
+  ([amicradle-stoves #8](https://github.com/DalsinAI/amicradle-stoves/pull/8),
   open, not merged, no CI). GCC 16.2.0 and binutils 2.47 from the GNU releases,
   pinned by SHA-256 and checked against GNU's signatures. Two patches ported from
   AmigaLabs' adtools (`binutils/2.40` at `063184c1`, `gcc/15` at `87ac263c`).
   clib2 (`1a42c693`, BSD 3-Clause) and clib4 (`30e487d2`, BSD 3-Clause; it also
   carries `LICENSE-GPL` and `LICENSE-OPENLIBM`) built from source. `-mcrt=` picks newlib, clib2 or clib4.
-- **The stove:** amigachrome's `scripts/build_os4_stove.sh` (amicradle #496,
+- **The stove:** amicradle's `scripts/build_os4_stove.sh` (amicradle #496,
   merged) runs the recipe into Cradle's Stoves folder as ACKitchen's `os4` stove.
-  Until amigachrome-stoves #8 is merged, it needs
+  Until amicradle-stoves #8 is merged, it needs
   `OS4_STOVE_REF=origin/team3/os4-gcc16`, because `origin/main` has no
   `os4-gcc16/` yet.
 - **Built and tested:** one full build on the Cradle machine, 14 October 2026,
@@ -48,7 +48,7 @@ redistribute. The user downloads it and puts it in place, as with the AmigaOS
 
 ## What is missing before it can be released
 
-1. **The recipe merged, with CI.** amigachrome-stoves #8 is open and has no CI.
+1. **The recipe merged, with CI.** amicradle-stoves #8 is open and has no CI.
    A release should be built from a merged commit that CI has built.
 2. **A compiler that can move.** The built stove's specs hold the SDK's full
    path (`base_sdk`, the stove's own `prefix/ppc-amigaos/SDK/`), and the
@@ -67,5 +67,5 @@ redistribute. The user downloads it and puts it in place, as with the AmigaOS
 6. **Run-time tests on AmigaOS 4.1:** the smoke tests run on an AC460, at least
    for newlib, clib2 and clib4, C and C++.
 7. **The decision to publish,** and where: in this repository's next release,
-   beside the `m68k-amigaos` toolchain, or as amigachrome-stoves releases (that
+   beside the `m68k-amigaos` toolchain, or as amicradle-stoves releases (that
    repository's README says built stoves are published as releases there).

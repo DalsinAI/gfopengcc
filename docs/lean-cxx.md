@@ -16,7 +16,7 @@ Existing C moves to C++ only when it is next reworked.
 | libstdc++ | not linked | linked; header-only parts preferred |
 | Global objects with constructors or destructors | none: `constinit`/`constexpr` data only | allowed (libnix runs them), but avoid in hot start-up paths |
 | `new`/`delete` | our own, in the library's glue (see below) | libstdc++'s, or a class's own pool |
-| Threads | exec tasks and signals, through the library's own code | `std::thread` and friends work (amigachrome-stoves' t1-t19) |
+| Threads | exec tasks and signals, through the library's own code | `std::thread` and friends work (amicradle-stoves' t1-t19) |
 
 An app that needs exceptions or `dynamic_cast` (a port that uses them, such as a parser library) leaves those two flags out; the stove's tests t1, t2 and t11 show both work. WebKit already builds with `-fno-exceptions -fno-rtti`.
 
@@ -28,7 +28,7 @@ An app that needs exceptions or `dynamic_cast` (a port that uses them, such as a
 4. **Only header-only, allocation-free standard headers.** `<array>`, `<span>`, `<string_view>`, `<algorithm>`, `<utility>`, `<optional>`, `<variant>`, `<bit>`, `<type_traits>`, `<limits>`, `<cstdint>`, `<cstring>`, `<concepts>`. Not `<string>`, `<vector>`, `<map>`, `<iostream>`, `<thread>`, `<mutex>`, `<functional>` (they need libstdc++ or allocate behind your back); write a small container on the library's allocator when one is needed.
 5. **The library base and anything shared with C stay standard-layout.** Structs that cross the jump table, or that C code or 68k assembler reads, have no virtual functions or base classes; `static_assert(std::is_standard_layout_v<T>)` next to them.
 6. **The entry points stay `extern "C"`.** A C++ function called from the jump table is declared `extern "C"` and takes its library base as an argument; it never lets anything escape as an exception (there are none with these flags).
-7. **The 68k inline rules still hold.** Never nest one inline library call in another's arguments (wrong A6); see openamigasdk `Docs/PORTING.md`.
+7. **The 68k inline rules still hold.** Never nest one inline library call in another's arguments (wrong A6); see gfopensdk `Docs/PORTING.md`.
 
 ## Not yet working
 

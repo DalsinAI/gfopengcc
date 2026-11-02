@@ -18,11 +18,11 @@ rsync -a --no-group --exclude '/m68k-amigaos/ndk/' --exclude '/m68k-amigaos/ndk-
   --exclude '/m68k-amigaos/ndk13-include/' --exclude '/m68k-amigaos/ndk-include.vendor/' "$PREFIX/" "$S/$BIN/"
 
 # The source: amiga-gcc and its modules as built (patches applied), and this repository.
-mkdir -p "$S/$SRC/amiga-gcc" "$S/$SRC/openamigagcc"
+mkdir -p "$S/$SRC/amiga-gcc" "$S/$SRC/gfopengcc"
 rsync -a --no-group --exclude '.git' --exclude '/build-*/' --exclude '/download/' --exclude '/log/' \
-  --exclude '/openamigagcc-logs/' --exclude '/projects/NDK3.2*' --exclude '/projects/openamigasdk/OpenNDK/lib/build/' \
+  --exclude '/openamigagcc-logs/' --exclude '/projects/NDK3.2*' --exclude '/projects/gfopensdk/OpenNDK/lib/build/' \
   "$WORK/" "$S/$SRC/amiga-gcc/"
-rsync -a --no-group --exclude '.git' --exclude '__pycache__' "$HERE/" "$S/$SRC/openamigagcc/"
+rsync -a --no-group --exclude '.git' --exclude '__pycache__' "$HERE/" "$S/$SRC/gfopengcc/"
 
 # Nothing of the NDK, and every libamiga.a GFOpenNDK's.
 bad=$(cd "$S" && find . \( -path '*/projects/NDK3.2*' -o -name 'NDK3.2.lha' -o -iname 'amiga.lib' -o -name 'ndk-include' -o -name 'ndk13-include' \) -print | head -5)

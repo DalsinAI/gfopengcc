@@ -1,6 +1,6 @@
 #!/bin/sh
 # Copyright (c) 2026 AmiCradle Team. GPL-3.0-or-later, like the patches it goes with.
-# Base-relative C++ with the os32-gcc16 stove: t3_threads.cpp (amigachrome-stoves
+# Base-relative C++ with the os32-gcc16 stove: t3_threads.cpp (amicradle-stoves
 # os32-gcc16/tests/src) built three ways.
 #   build.sh [OUT]     STOVE: a stove folder with prefix/ and compat/ (default ~/AmiCradle/stoves/os32-gcc16)
 #   t3-plain   links and runs (control)
@@ -13,7 +13,7 @@ OUT=${1:-$HERE/out}
 P=$STOVE/prefix/bin/m68k-amigaos-
 WRAP="-los32compat -Wl,--wrap=malloc -Wl,--wrap=calloc -Wl,--wrap=realloc -Wl,--wrap=free -Wl,-u,___wrap_malloc -Wl,-u,___wrap_free -Wl,-u,___wrap_calloc -Wl,-u,___wrap_realloc"
 # libos32compat must match the code model (FINDINGS.md: the absolute one hangs a
-# base-relative program): compat/, compat/libb or compat/libb32 (amigachrome-stoves #7).
+# base-relative program): compat/, compat/libb or compat/libb32 (amicradle-stoves #7).
 compat_dir() { case $1 in *-fbaserel32*) echo "$STOVE/compat/libb32";; *-fbaserel*) echo "$STOVE/compat/libb";; *) echo "$STOVE/compat";; esac; }
 F="-m68040 -m68881 -O2 -fno-delete-null-pointer-checks -fomit-frame-pointer -std=gnu++23"
 mkdir -p "$OUT"

@@ -10,5 +10,5 @@ fd2sfd            https://franke.ms/git/bebbo/fd2sfd             7b73220f99b9bbb
 sfdc              https://franke.ms/git/bebbo/sfdc               db0b1d86c7152ec919fdd119bad707aa04a7f775  projects/sfdc
 fd2pragma         https://github.com/adtools/fd2pragma           8c0f352c348a3252f84170eab737919372562e82  projects/fd2pragma
 amiga-netinclude  https://franke.ms/git/bebbo/amiga-netinclude   48b0f9ab4cc6d10b2f5c035d556a2169bdbe6875  projects/amiga-netinclude
-# GFOpenNDK (DalsinAI/openamigasdk): the source of libamiga.a (build.sh step 5b).
-openamigasdk      https://github.com/DalsinAI/openamigasdk        399d1c4ce8c04ef90829e572d1bba69080284eaf  projects/openamigasdk
+# GFOpenNDK (DalsinAI/gfopensdk): the source of libamiga.a (build.sh step 5b).
+gfopensdk      https://github.com/DalsinAI/gfopensdk        399d1c4ce8c04ef90829e572d1bba69080284eaf  projects/gfopensdk

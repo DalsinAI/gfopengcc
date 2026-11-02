@@ -1,6 +1,6 @@
 # Base-relative C++: findings (daletop, 12 October 2026)
 
-Stove: openamigagcc main f9efa3d full build (~/stoves-work/stove-gcc16-pth), compat from the installed os32-gcc16 stove. Labs: a lab copy of Instance-32 (AmigaOS 3.2.3, AC090 68040), clean start for each run.
+Stove: gfopengcc main f9efa3d full build (~/stoves-work/stove-gcc16-pth), compat from the installed os32-gcc16 stove. Labs: a lab copy of Instance-32 (AmigaOS 3.2.3, AC090 68040), clean start for each run.
 
 ## A. Multilibs
 

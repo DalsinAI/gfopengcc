@@ -1,11 +1,11 @@
 # libnix: setlocale() from several threads (t18)
 
 **Patch:** `patches/libnix/0006-setlocale-safe-from-several-threads-at-once-libstdc-.patch`
-**Reproducer:** `tests/libnix/setlocale_threads.c` (on the Amiga), and amigachrome-stoves' t18
+**Reproducer:** `tests/libnix/setlocale_threads.c` (on the Amiga), and amicradle-stoves' t18
 
 ## Symptom
 
-amigachrome-stoves' t18 has 8 threads format numbers with `ostringstream` and read them back with `istringstream`. It never finished on AmigaOS. It printed each thread's first line, then hung. Sometimes it took more with it: on 11 October the Shell running it ended, and on 12 October the agent's next command never ran and no new Shell would open.
+amicradle-stoves' t18 has 8 threads format numbers with `ostringstream` and read them back with `istringstream`. It never finished on AmigaOS. It printed each thread's first line, then hung. Sometimes it took more with it: on 11 October the Shell running it ended, and on 12 October the agent's next command never ran and no new Shell would open.
 
 ## Cause
 

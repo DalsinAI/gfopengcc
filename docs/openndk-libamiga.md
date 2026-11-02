@@ -16,7 +16,7 @@ software, and programs built with the toolchain carried their objects.
 
 - `build.sh` step 2b removes the two prebuilt files from the work folder
   before amiga-gcc's build runs, so they are never installed.
-- Step 5b builds GFOpenNDK's `libamiga.a` (DalsinAI/openamigasdk, pinned in
+- Step 5b builds GFOpenNDK's `libamiga.a` (DalsinAI/gfopensdk, pinned in
   `scripts/sources.lock`) with the new compiler once for every multilib
   folder that `-print-multi-lib` lists, each with that multilib's own
   flags: `.` for the 68000, `libm020` with `-mcpu=68020`, `libm060` with
