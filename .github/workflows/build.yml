@@ -12,7 +12,7 @@ on:
   workflow_dispatch:
     inputs:
       release:
-        description: 'Publish this build as a release, e.g. 16.2.0-open4 (needs docs/releases/<version>.md); empty builds only'
+        description: 'Publish this build as a release, e.g. 16.2.0-open5 (needs docs/releases/<version>.md); empty builds only'
         required: false
         default: ''
 

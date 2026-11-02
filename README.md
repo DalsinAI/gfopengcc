@@ -15,7 +15,7 @@ It builds on bebbo's amiga-gcc line (GCC for `m68k-amigaos` with libnix) and add
 
 ## Status
 
-**Next: 16.2.0-open5** ([notes](docs/releases/16.2.0-open5.md)): the first release under the GFOpen name. The compiler says `GFOpenAmigaGCC 16.2.0-open5` and the tarballs are `gfopenamigagcc-16.2.0-open5-*.tar.xz`; open1 to open4 keep their `OpenAmigaGCC` identity and `openamigagcc-*` tarballs. It adds the per-multilib `libamiga.a` and pthreads 0007 to open4.
+**Next: 16.2.0-open5** ([notes](docs/releases/16.2.0-open5.md)): the first release under the GFOpen name. The compiler says `GFOpenAmigaGCC 16.2.0-open5` and the tarballs are `gfopenamigagcc-16.2.0-open5-*.tar.xz`; open1 to open4 keep their `OpenAmigaGCC` identity and `openamigagcc-*` tarballs. It adds the per-multilib `libamiga.a` and pthreads 0007, 0008 and 0009 (tasks pthreads did not make get records of their own) to open4.
 
 **16.2.0-open4, 30 October 2026** ([notes](docs/releases/16.2.0-open4.md)): every fix below, adding the late-combine and vregs wrong-code fixes (GCC 0013, 0014) and libnix's `strtol`/`strtoul` end pointers (libnix 0008) to open3. `16.2.0-open3` (19 October 2026) added built-in 68020/68030/68040 soft-float library selection and an unambiguous compiler identity; `16.2.0-open2` (12 October 2026) added the thread, C++ and nested-call fixes; `16.2.0-open1` (9 October 2026) has GCC patches 0001-0009, libnix 0001-0003 and the two header fixes.
 
