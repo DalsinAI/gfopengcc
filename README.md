@@ -8,14 +8,16 @@ It builds on bebbo's amiga-gcc line (GCC for `m68k-amigaos` with libnix) and add
 
 | System | Target | Provided by | How to install | Status |
 | --- | --- | --- | --- | --- |
-| AmigaOS 3.2.3 (and AmigaOS 3.x) on 68k | `m68k-amigaos` | this repository's 16.2.0-open4 release: the x86-64 Linux toolchain and the complete source. For ARM64 Linux, 16.2.0-open1's toolchain. | unpack the toolchain and add the AmigaOS 3.2 NDK: [docs/install.md](docs/install.md) | open4, 30 October 2026 |
+| AmigaOS 3.2.3 (and AmigaOS 3.x) on 68k | `m68k-amigaos` | this repository's 16.2.0-open4 release (16.2.0-open5, the first named GFOpenAmigaGCC, is prepared): the x86-64 Linux toolchain and the complete source. For ARM64 Linux, 16.2.0-open1's toolchain. | unpack the toolchain and add the AmigaOS 3.2 NDK: [docs/install.md](docs/install.md) | open4, 30 October 2026 |
 | AmiCradle (its 68k instances, which run AmigaOS 3.2.3) | `m68k-amigaos` | the same compiler, as ACKitchen's `os32-gcc16` stove, built from this repository's `scripts/build.sh`. AROS 68k instances use amicradle-stoves' `aros68k-gcc16` (`m68k-aros`) instead. | the stove is built on the Cradle machine into Cradle's Stoves folder, with its own copy of the NDK (never in git or a release); or install the release as for AmigaOS 3.2.3 | in use |
 | GFOS (GirlfriendOS): the Team's own system, AmiCradle with the open ROM | `m68k-amigaos` | the `os32-gcc16` stove, as in the AmiCradle row: the open ROM's modules build with it against the stove's NDK 3.2 headers (there is no open ROM NDK yet), and its exec with `aros68k-gcc16` (`m68k-aros`) | as for the AmiCradle row | name not final |
 | AmigaOS 4.1 on PowerPC | `ppc-amigaos` | amicradle-stoves' `os4-gcc16` recipe (GCC 16.2.0, binutils 2.47, clib2 and clib4), [amicradle-stoves #8](https://github.com/DalsinAI/amicradle-stoves/pull/8), open. amicradle's `scripts/build_os4_stove.sh` (amicradle #496, merged) builds it as ACKitchen's `os4` stove. | not yet in a release: build it from the recipe, which downloads Hyperion's AmigaOS 4.1 SDK on the building machine | not yet: [docs/ppc-amigaos.md](docs/ppc-amigaos.md) says what is missing |
 
 ## Status
 
-**16.2.0-open4, 30 October 2026** ([notes](docs/releases/16.2.0-open4.md), [install](docs/install.md)): every fix below, adding the late-combine and vregs wrong-code fixes (GCC 0013, 0014) and libnix's `strtol`/`strtoul` end pointers (libnix 0008) to open3. `16.2.0-open3` (19 October 2026) added built-in 68020/68030/68040 soft-float library selection and an unambiguous compiler identity; `16.2.0-open2` (12 October 2026) added the thread, C++ and nested-call fixes; `16.2.0-open1` (9 October 2026) has GCC patches 0001-0009, libnix 0001-0003 and the two header fixes.
+**Next: 16.2.0-open5** ([notes](docs/releases/16.2.0-open5.md)): the first release under the GFOpen name. The compiler says `GFOpenAmigaGCC 16.2.0-open5` and the tarballs are `gfopenamigagcc-16.2.0-open5-*.tar.xz`; open1 to open4 keep their `OpenAmigaGCC` identity and `openamigagcc-*` tarballs. It adds the per-multilib `libamiga.a` and pthreads 0007 to open4.
+
+**16.2.0-open4, 30 October 2026** ([notes](docs/releases/16.2.0-open4.md)): every fix below, adding the late-combine and vregs wrong-code fixes (GCC 0013, 0014) and libnix's `strtol`/`strtoul` end pointers (libnix 0008) to open3. `16.2.0-open3` (19 October 2026) added built-in 68020/68030/68040 soft-float library selection and an unambiguous compiler identity; `16.2.0-open2` (12 October 2026) added the thread, C++ and nested-call fixes; `16.2.0-open1` (9 October 2026) has GCC patches 0001-0009, libnix 0001-0003 and the two header fixes.
 
 | Bug | Where | Status |
 | --- | --- | --- |

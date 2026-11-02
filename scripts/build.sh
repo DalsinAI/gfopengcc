@@ -12,7 +12,7 @@ set -euo pipefail
 WORK=$(cd "$1" && pwd); PREFIX=$2; NDK=$3; JOBS=${4:-$(nproc)}
 HERE=$(cd "$(dirname "$0")/.." && pwd)
 mkdir -p "$PREFIX"; PREFIX=$(cd "$PREFIX" && pwd)
-LOGS=$WORK/openamigagcc-logs; mkdir -p "$LOGS"
+LOGS=$WORK/gfopenamigagcc-logs; mkdir -p "$LOGS"
 NOFETCH=""
 if unshare -n --map-current-user true 2>/dev/null; then NOFETCH="unshare -n --map-current-user"; fi
 say() { echo "== $*"; }
@@ -27,8 +27,11 @@ grep -v '^#' "$HERE/scripts/sources.lock" | while read -r name url commit dir; d
   fi
 done
 
-# 2. Patches, each applied once: WORK/.openamigagcc-applied lists the ones in.
-STAMP=$WORK/.openamigagcc-applied; touch "$STAMP"
+# 2. Patches, each applied once: WORK/.gfopenamigagcc-applied lists the ones in
+#    (.openamigagcc-applied up to open4: a work folder that has it keeps it).
+STAMP=$WORK/.gfopenamigagcc-applied
+[ -e "$STAMP" ] || [ ! -e "$WORK/.openamigagcc-applied" ] || mv "$WORK/.openamigagcc-applied" "$STAMP"
+touch "$STAMP"
 same_stamped_diff() {   # PATCH: an older revision has the same diff and its exact hash is stamped
   local p=$1 rel=${1#"$HERE"/} now commit old_hash old_patch_id
   now=$(git patch-id --stable < "$p" | awk '{print $1}')
@@ -160,8 +163,10 @@ fi
 say checks
 CC="$PREFIX/bin/m68k-amigaos-gcc"
 C=$LOGS/check; mkdir -p "$C"
-"$CC" --version | head -1 | grep -Fq '(OpenAmigaGCC 16.2.0-open4)' || {
-  echo "gcc does not identify itself as OpenAmigaGCC 16.2.0-open4"; exit 1;
+# The identity patches/amiga-gcc/0002 gives it (tests/release-names.sh keeps them in step).
+ID="GFOpenAmigaGCC 16.2.0-open5"
+"$CC" --version | head -1 | grep -Fq "($ID)" || {
+  echo "gcc does not identify itself as $ID"; exit 1;
 }
 link_cpu=$("$CC" -dumpspecs | sed -n '/^\*link_cpu:/{n;p;q;}')
 case "$link_cpu" in
