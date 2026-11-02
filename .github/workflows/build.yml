@@ -49,6 +49,9 @@ jobs:
             libgmp-dev libmpfr-dev libmpc-dev rsync git lhasa autoconf gettext \
             libncurses-dev libreadline-dev qemu-user python3
 
+      - name: Release names agree
+        run: tests/release-names.sh ${{ inputs.release }}
+
       - name: Fetch sources
         run: scripts/fetch.sh "$WORK"
 
@@ -108,7 +111,7 @@ jobs:
         with:
           name: logs
           path: |
-            ${{ env.WORK }}/openamigagcc-logs
+            ${{ env.WORK }}/gfopenamigagcc-logs
             ${{ env.WORK }}/log
 
   release:
@@ -136,5 +139,5 @@ jobs:
           cd "$RUNNER_TEMP/out" && sha256sum -c SHA256SUMS && cd "$GITHUB_WORKSPACE"
           gh release create "v$V" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
             --title "GFOpenAmigaGCC $V" --notes-file "docs/releases/$V.md" \
-            "$RUNNER_TEMP/out/openamigagcc-$V-x86_64-linux.tar.xz" \
-            "$RUNNER_TEMP/out/openamigagcc-$V-src.tar.xz" "$RUNNER_TEMP/out/SHA256SUMS"
+            "$RUNNER_TEMP/out/gfopenamigagcc-$V-x86_64-linux.tar.xz" \
+            "$RUNNER_TEMP/out/gfopenamigagcc-$V-src.tar.xz" "$RUNNER_TEMP/out/SHA256SUMS"

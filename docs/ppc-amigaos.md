@@ -30,8 +30,8 @@ it is not part of 16.2.0-open2 or any other release here yet.
 
 | File | What |
 | --- | --- |
-| `openamigagcc-16.2.0-openN-ppc-amigaos-x86_64-linux.tar.xz` | `bin/`, `libexec/`, `lib/gcc/ppc-amigaos/16.2.0/` (libgcc, and its clib2 build), `ppc-amigaos/lib/` (libstdc++, libatomic and libssp, and their clib2 builds), `ppc-amigaos/include/c++/`, the clib2 and clib4 headers, libraries and start-up files, and `clib4.library` |
-| `openamigagcc-16.2.0-openN-ppc-amigaos-src.tar.xz` | the recipe (`build.sh`, `sources.lock`, both patches, `PORTING.md`, the smoke tests), and the exact inputs it built from: `gcc-16.2.0.tar.xz`, `binutils-2.47.tar.bz2`, `gmp-6.3.0.tar.bz2`, `mpfr-4.2.2.tar.bz2`, `mpc-1.4.1.tar.xz`, `isl-0.27.tar.xz` (built into the compiler), and clib2 and clib4 at their pinned commits |
+| `gfopenamigagcc-16.2.0-openN-ppc-amigaos-x86_64-linux.tar.xz` | `bin/`, `libexec/`, `lib/gcc/ppc-amigaos/16.2.0/` (libgcc, and its clib2 build), `ppc-amigaos/lib/` (libstdc++, libatomic and libssp, and their clib2 builds), `ppc-amigaos/include/c++/`, the clib2 and clib4 headers, libraries and start-up files, and `clib4.library` |
+| `gfopenamigagcc-16.2.0-openN-ppc-amigaos-src.tar.xz` | the recipe (`build.sh`, `sources.lock`, both patches, `PORTING.md`, the smoke tests), and the exact inputs it built from: `gcc-16.2.0.tar.xz`, `binutils-2.47.tar.bz2`, `gmp-6.3.0.tar.bz2`, `mpfr-4.2.2.tar.bz2`, `mpc-1.4.1.tar.xz`, `isl-0.27.tar.xz` (built into the compiler), and clib2 and clib4 at their pinned commits |
 | `SHA256SUMS` | the checksums of both |
 
 Every input above is already on the machine that built the stove, so making the
