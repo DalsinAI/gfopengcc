@@ -30,3 +30,9 @@ m68k-amigaos-gcc -O2 -m68040 -noixemul -o exitpark exitpark.c -lpthread
 ```
 
 Run it on an Amiga whose trap handling parks a crashed task (GFOpenKick does; Kickstart's own shows a requester first), with `Run`, and check that the Shell gets `RC` back.
+
+`foreigntls.c` (`patches/aros-stuff/0008`): C `__thread` in three processes made with `CreateNewProc` and `NP_Entry`, as SDL2.module makes SDL threads. Each child must get the main thread's `__thread` block. With the stove's library (0001-0007) `pthread_getspecific` read `NULL->tlsvalues` and each child's block came out of low memory (0x000C6000 on GFOpenKick full21-t5); with 0008 every child prints "the main thread's" and the program prints `foreigntls OK` (rc 0).
+
+```bash
+m68k-amigaos-gcc -m68040 -O2 -noixemul -o foreigntls foreigntls.c -lpthread
+```

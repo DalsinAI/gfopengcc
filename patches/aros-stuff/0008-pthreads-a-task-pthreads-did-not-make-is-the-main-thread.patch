@@ -1,0 +1,82 @@
+pthreads: a task pthreads did not make is the main thread, not NULL->tlsvalues
+
+pthread_self() looks the calling task up with GetThreadId(), and AROS's
+original turned "not found" (PTHREAD_THREADS_MAX, from its fixed table) into
+0, the main thread. bebbo's growable table changed GetThreadId() to answer
+numThreads for a task it doesn't know (pthread_create relies on that to grow
+the table), but pthread_self() still compared with PTHREAD_THREADS_MAX, which
+never matches. So in a process pthreads didn't make (an SDL thread, which
+SDL2.module starts with CreateNewProc NP_Entry; a Workbench helper; any
+CreateNewProc'd process), pthread_self() gave an id with no ThreadInfo,
+GetThreadInfo() gave NULL, and pthread_getspecific() read
+NULL->tlsvalues[key]: the longword at 0x30 + 4 * key, in the CPU's vector
+table. GCC's emutls (every C __thread and C++ thread_local) asks
+pthread_getspecific() for the thread's block, so it took that vector, a ROM
+address, as its array and handed out a "block" read from the ROM's code.
+
+Kraptor (Allegro 4 over Allegro 5 and SDL2) on Instance-40 (GFOpenKick
+full21-t5): its SDL_allegro thread's tls_get() got 0x02002F3C, the bytes
+"0200 2F3C" of the ROM's vector-12 stub ("move.l #12,-(sp); bra ...") at
+$F804B4, and initialize_tls_values() wrote Allegro's 0x220-byte thread state
+there, where nothing answers (the task guard's log: 13 writes and 5 reads,
+$02002F3C-$02003150). On OS 3.2.3's ROM the vector points at other code, so
+the same read gave something that happened to work. The Codex session saw
+the addresses as BPTRs (a quarter of a fast-RAM address), and adaptive stacks
+were moving processes at the same moment; neither is the cause: the writes
+are the same with AC_STACK=off, AC_STACK_ADOPT=none, and with OpenDOS's
+pr_StackBase corrected.
+
+pthread_self() now answers 0 for any id GetThreadId() has no record for (id
+>= numThreads), as AROS meant: such a task shares the main thread's
+thread-local values. pthread_getspecific() and pthread_setspecific() also
+check GetThreadInfo()'s result, so no id can reach NULL->tlsvalues again
+(NULL, and EINVAL). Nothing changes for threads pthread_create made.
+
+tests/pthreads/foreigntls.c: three CreateNewProc NP_Entry processes use a
+C __thread array. On full21-t5 (lab t5-astack-20261102), with the stove's
+libpthread each child's "block" was 0x000C6000 (read out of the vector table
+and the ROM, somewhere in Chip RAM) and it wrote its values there; with this
+patch each child gets the main thread's block. Kraptor with pthread_self() patched the same way
+(its one pthread_self compare, kraptor+0x17F86E) makes no bad access.
+
+zlib licence, as aros-stuff's pthreads (README, docs/install.md). Copyright (c) 2026 AmiCradle Team.
+---
+diff --git a/pthreads/pthread.c b/pthreads/pthread.c
+--- a/pthreads/pthread.c
++++ b/pthreads/pthread.c
+@@ -303,6 +303,10 @@ int pthread_setspecific(pthread_key_t key, const void *value) {
+
+ 	ObtainSemaphore(&thread_sem);
+ 	inf = GetThreadInfo(thread);
++	if (!inf) {			// no record for this id: nothing to keep the value in
++		ReleaseSemaphore(&thread_sem);
++		return EINVAL;
++	}
+ 	inf->tlsvalues[key] = (void*) value;
+ 	ReleaseSemaphore(&thread_sem);
+
+@@ -323,7 +327,8 @@ void* pthread_getspecific(pthread_key_t key) {
+
+ 	ObtainSemaphore(&thread_sem);
+ 	inf = GetThreadInfo(thread);
+-	value = inf->tlsvalues[key];
++	if (inf)			// no record for this id: no value (never NULL->tlsvalues)
++		value = inf->tlsvalues[key];
+ 	ReleaseSemaphore(&thread_sem);
+
+ 	return value;
+@@ -1803,7 +1808,13 @@ pthread_t pthread_self(void) {
+
+ 	thread = GetThreadId(task);
+
+-	if (thread == PTHREAD_THREADS_MAX)
++	// A task pthreads did not make (the main task before pthreads knew it, an
++	// SDL thread, a Workbench helper): the main thread's id, as AROS's
++	// original meant. GetThreadId answers numThreads for a task it doesn't
++	// know (pthread_create uses that to grow the table), never
++	// PTHREAD_THREADS_MAX, so the old test never matched: pthread_self gave
++	// an id with no ThreadInfo, and pthread_getspecific read NULL->tlsvalues.
++	if (thread >= numThreads)
+ 		return 0;
+
+ 	return thread;
