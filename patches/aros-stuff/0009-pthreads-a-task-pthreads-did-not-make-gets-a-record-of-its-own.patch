@@ -1,0 +1,550 @@
+pthreads: a task pthreads did not make gets a record of its own, freed when it ends
+
+0008 made a task pthreads did not make (an SDL thread, which SDL2.module
+starts with CreateNewProc and NP_Entry; a Workbench helper; any
+CreateNewProc'd process) the main thread, so it shared the main thread's
+thread-local values: GCC's emutls gave every such task the main thread's
+__thread block, and Allegro's per-thread state in Kraptor's SDL_allegro thread
+would be the main thread's. Dale chose (2 Nov 2026, 18:55) "own record +
+cleanup": such a task gets a pthreads record and TLS block of its own, and the
+record is freed when the task ends.
+
+Registration. The first time such a task calls pthread_self() (directly, or
+through pthread_getspecific/setspecific and so emutls), it is given a free slot
+of the thread table, under thread_sem, the lock pthread_create uses; the table
+grows as for pthread_create (FreeSlot, shared with it). Its ThreadInfo is
+marked foreign: started, detached (pthread_join and pthread_detach answer
+EINVAL), no parent (pthread_cancel answers ESRCH), its own tlsvalues, cleanup
+list and cancel state; pthread_exit in it runs the cleanup handlers and
+returns, as in the main thread, instead of longjmp-ing to a StarterFunc it
+never had.
+
+Cleanup. OS 3 has no exec call-back when a task ends, so each foreign record
+is tied to its task with a token: a one-entry MemList (12 bytes: a magic
+number, the slot and this program's table address) added to the task's own
+tc_MemEntry list, which RemTask frees with the task. A sweep finds the records
+whose task has gone: under Disable() it walks SysBase->TaskReady and TaskWait
+(and ThisTask) and each task's tc_MemEntry (at most 64 nodes, skipping a list
+that was never initialised), marking the records whose token it finds on the
+task they name. Every foreign record not marked is taken out of use; then,
+with thread_sem released, its key destructors run (PTHREAD_DESTRUCTOR_ITERATIONS
+passes, as StarterFunc runs them for a thread that ends, but in the sweeping
+task), its leftover cleanup handlers are freed, and its slot is free again.
+The sweep runs when a foreign task registers, at pthread_create and at
+pthread_key_create, and only when foreign records exist. The token also stops
+a new task that exec happens to allocate where an ended one was from taking
+that task's record: pthread_self() takes a foreign record only if its token is
+on the calling task's own list.
+
+Table full. If no slot is left after the sweep (PTHREAD_THREADS_MAX, 2019,
+the main thread included), or memory is short, the task is the main thread
+(id 0), as with 0008, and never a NULL record. A task refused for a full table
+gets a token for no slot, so it stays the main thread for its whole life (its
+TLS block never changes under it) and later calls answer at once. If the token
+itself can't be allocated it is the main thread and asks again next time.
+
+Exit. __pthread_Exit_Func no longer waits for foreign records (they are not
+joinable): it takes this program's tokens off the tasks still running and
+drops the records, without destructors, as exit() does for the main thread's
+values.
+
+The NULL checks of 0008 in pthread_getspecific/setspecific stay.
+
+tests/pthreads/foreigntls.c: three NP_Entry children alive at once each get
+their own id, __thread block and key value, with nothing leaking between them
+or into the main thread; their ids are not joinable or cancellable; after they
+end, a pthread_key_create runs the key's destructor for each; ten more rounds
+reuse the same three records with every destructor run (33 of 33); a
+pthread_create'd thread is unaffected. "foreigntls full" fills the table with
+2018 parked children: the 2019th is the main thread, stays so after the table
+has emptied, and children started then get records again.
+
+zlib licence, as aros-stuff's pthreads (README, docs/install.md). Copyright (c) 2026 AmiCradle Team.
+---
+diff --git a/pthreads/pthread.c b/pthreads/pthread.c
+index 8239498..d156bc6 100644
+--- a/pthreads/pthread.c
++++ b/pthreads/pthread.c
+@@ -121,6 +121,10 @@ typedef struct {
+ 	short canceltype;
+ 	short canceled;
+ 	jmp_buf jmp;
++	char foreign;		// FOREIGN_LIVE or FOREIGN_REAPING: a task pthreads did not make (0: one it made)
++	char alive;		// set by the sweep's mark pass (ForeignCollect)
++	struct MemList *token;	// a foreign record's token, in its task's tc_MemEntry
++	void *reapnext;		// the sweep's list of records whose task has ended
+ } ThreadInfo;
+ 
+ /* One ThreadInfo per slot, each allocated once and never moved: a running
+@@ -133,6 +137,48 @@ static TLSKey *_tlskeys;
+ static unsigned numTlskeys;
+ static struct SignalSemaphore tls_sem;
+ 
++/* Records of their own for tasks pthreads did not make (patches/aros-stuff/0009).
++   An SDL thread (SDL2.module starts them with CreateNewProc and NP_Entry), a
++   Workbench helper or any CreateNewProc'd process that calls pthreads (GCC's
++   emutls does, for every __thread and thread_local) gets a ThreadInfo of its
++   own the first time it asks pthread_self(), in a free slot of the same table:
++   its own TLS values, cleanup list and cancel state. It is "foreign": not
++   joinable (detached, so pthread_join and pthread_detach answer EINVAL), not
++   cancellable (no parent, so pthread_cancel answers ESRCH), and pthread_exit
++   never longjmps out of it.
++
++   OS 3 has no call-back when a task ends, so each foreign record is tied to its
++   task by a token: a one-entry MemList put on the task's own tc_MemEntry list,
++   which RemTask frees with the task. The token's block holds TOKEN_MAGIC, the
++   slot and this program's _threads; the record holds the token's address.
++   A record whose task is gone is found by a sweep: under Disable(), every task
++   on SysBase->TaskReady and TaskWait (and ThisTask) has its tc_MemEntry looked
++   through for this program's tokens, and a foreign record whose token is on no
++   live task's list is reaped: its key destructors run (in the sweeping task),
++   then its slot is free. The token also tells a new task that happens to be
++   allocated where an ended one was from that task: pthread_self() only takes a
++   foreign record whose token is on the calling task's own list.
++
++   The sweep runs when a foreign task registers, at pthread_create and at
++   pthread_key_create, and only if foreign records exist. When the table is
++   full (PTHREAD_THREADS_MAX) after a sweep, the task is the main thread, as in
++   0008, for its whole life: it gets a token for slot FALLBACK_SLOT, so later
++   calls answer 0 at once and it never changes TLS block mid-life. At exit,
++   foreign records are dropped without their destructors (as exit() does for
++   the main thread's values) and this program's tokens are taken off the tasks
++   still running. */
++#if defined(__AMIGA__) && !defined(__MORPHOS__) && !defined(__AROS__)
++#define FOREIGN_RECORDS 1
++#define FOREIGN_LIVE 1
++#define FOREIGN_REAPING 2
++#define TOKEN_MAGIC 0x50546846UL	// 'PThF'
++#define TOKEN_PRI (-97)		// the token MemList's ln_Pri, with ln_Type NT_MEMORY
++#define FALLBACK_SLOT 0x7FFFFFFFUL	// a token for a task that is the main thread (table full)
++#define MAX_MEMENTRY_WALK 64	// a task's tc_MemEntry nodes looked at, at most
++static unsigned numForeign;	// foreign records, live or being reaped (thread_sem)
++static void ForeignSweep(void);
++#endif
++
+ //
+ // Helper functions
+ //
+@@ -166,6 +212,40 @@ static ThreadInfo* GetThreadInfo(pthread_t thread) {
+ 	return 0;
+ }
+ 
++#ifdef FOREIGN_RECORDS
++/* ml is one of this program's tokens: the slot it is for, or -1. */
++static long TokenSlot(struct MemList *ml) {
++	ULONG *b;
++
++	if (ml->ml_Node.ln_Type != NT_MEMORY || ml->ml_Node.ln_Pri != TOKEN_PRI || ml->ml_NumEntries != 1
++	    || ml->ml_ME[0].me_Length != 3 * sizeof(ULONG))
++		return -1;
++	b = (ULONG *)ml->ml_ME[0].me_Addr;
++	if (!b || ((ULONG)b & 1) || b[0] != TOKEN_MAGIC || b[2] != (ULONG)_threads)
++		return -1;
++	return (long)b[1];
++}
++
++/* The first token of this program's on task's tc_MemEntry (slot >= 0: the one for
++   that slot), or NULL. The caller's own list, or another task's under Disable(). */
++static struct MemList *FindToken(struct Task *task, long slot) {
++	struct Node *n = task->tc_MemEntry.lh_Head;
++	int k;
++
++	// a hand-made task may never have had its list initialised
++	for (k = 0; n && !((ULONG)n & 1) && n->ln_Succ && k < MAX_MEMENTRY_WALK; n = n->ln_Succ, k++) {
++		long s = TokenSlot((struct MemList *)n);
++		if (s != -1 && (slot < 0 || s == slot))
++			return (struct MemList *)n;
++	}
++	return NULL;
++}
++
++static int TokenHeld(struct Task *task, struct MemList *token, pthread_t slot) {
++	return token && FindToken(task, (long)slot) == token;
++}
++#endif
++
+ static pthread_t GetThreadId(struct Task *task) {
+ 	pthread_t i;
+ 
+@@ -174,8 +254,15 @@ static pthread_t GetThreadId(struct Task *task) {
+ 
+ // 0 is main task, First thread id will be 1 so that it is different than default value of pthread_t
+ 	for (i = 0; i < numThreads; i++) {
+-		if (_threads[i]->task == task)
++		if (_threads[i]->task == task) {
++#ifdef FOREIGN_RECORDS
++			// a foreign record is the caller's only if its token is on the caller's own
++			// list: an ended task's record is never taken by a new task at its address
++			if (task && _threads[i]->foreign && !TokenHeld(task, _threads[i]->token, i))
++				continue;
++#endif
+ 			break;
++		}
+ 	}
+ 
+ 	return i;
+@@ -202,6 +289,252 @@ static int __m68k_sync_val_compare_and_swap(int *v, int o, int n)
+ #undef __sync_lock_test_and_set
+ #endif
+ 
++/* A free slot (its task NULL), growing the table if need be, or
++   PTHREAD_THREADS_MAX when the table is full or memory is short. thread_sem held. */
++static pthread_t FreeSlot(void) {
++	pthread_t threadnew = GetThreadId(NULL);
++
++	if (threadnew == PTHREAD_THREADS_MAX)
++		return PTHREAD_THREADS_MAX;
++
++	if (threadnew == numThreads) {
++		// resize the thread's storage.
++		unsigned n = numThreads + numThreads + 2;
++
++		D(bug("** %s(resize to %ld)\n", __FUNCTION__, n));
++
++		if (n > PTHREAD_THREADS_MAX)
++			n = PTHREAD_THREADS_MAX;
++
++		if (n != numThreads) {
++			unsigned i;
++			for (i = numThreads; i < n; i++) {
++				ThreadInfo *t = (ThreadInfo*) calloc(1, sizeof(ThreadInfo));
++				if (!t) {
++					numThreads = i;
++					return PTHREAD_THREADS_MAX;
++				}
++				_threads[i] = t;
++			}
++			numThreads = n;
++		}
++	}
++	return threadnew;
++}
++
++#ifdef FOREIGN_RECORDS
++/* Run a reaped record's key destructors, as StarterFunc does for a thread that
++   ends, then free its slot. thread_sem is not held (the destructors may call
++   pthreads); the records are FOREIGN_REAPING, so no one else touches them. */
++static void ForeignReap(ThreadInfo *list) {
++	ThreadInfo *inf;
++	int i, j, foundkey;
++
++	for (inf = list; inf; inf = (ThreadInfo *)inf->reapnext) {
++		CleanupHandler *handler;
++
++		ObtainSemaphoreShared(&tls_sem);
++		foundkey = TRUE;
++		for (j = 0; foundkey && j < PTHREAD_DESTRUCTOR_ITERATIONS; j++) {
++			foundkey = FALSE;
++			for (i = 0; i < numTlskeys; i++) {
++				if (_tlskeys[i].used && _tlskeys[i].destructor && inf->tlsvalues[i]) {
++					void *oldvalue = inf->tlsvalues[i];
++					inf->tlsvalues[i] = NULL;
++					_tlskeys[i].destructor(oldvalue);
++					foundkey = TRUE;
++				}
++			}
++		}
++		ReleaseSemaphore(&tls_sem);
++		// cleanup handlers its task pushed and never popped: freed, not run
++		while ((handler = (CleanupHandler*) RemHead((struct List*) &inf->cleanup)))
++			free(handler);
++	}
++
++	ObtainSemaphore(&thread_sem);
++	while ((inf = list)) {
++		list = (ThreadInfo *)inf->reapnext;
++		inf->reapnext = NULL;
++		inf->token = NULL;
++		inf->foreign = 0;
++		inf->task = NULL;	// the slot is free
++		numForeign--;
++	}
++	ReleaseSemaphore(&thread_sem);
++}
++
++/* Mark every live foreign record whose token is on a running task's list.
++   Disable() held: the task lists, and each task's tc_MemEntry, hold still. */
++static void ForeignMark(struct Task *task) {
++	struct Node *n = task->tc_MemEntry.lh_Head;
++	int k;
++
++	for (k = 0; n && !((ULONG)n & 1) && n->ln_Succ && k < MAX_MEMENTRY_WALK; n = n->ln_Succ, k++) {
++		long s = TokenSlot((struct MemList *)n);
++		if (s >= 0 && (ULONG)s < numThreads) {
++			ThreadInfo *inf = _threads[s];
++			if (inf->foreign == FOREIGN_LIVE && inf->token == (struct MemList *)n && inf->task == task)
++				inf->alive = 1;
++		}
++	}
++}
++
++/* thread_sem held. The foreign records whose task has ended, taken out of use
++   (FOREIGN_REAPING) and chained for ForeignReap. */
++static ThreadInfo *ForeignCollect(void) {
++	ThreadInfo *list = NULL;
++	struct Node *n;
++	pthread_t i;
++
++	if (!numForeign)
++		return NULL;
++	for (i = 0; i < numThreads; i++)
++		_threads[i]->alive = 0;
++	Disable();
++	ForeignMark(SysBase->ThisTask);
++	for (n = SysBase->TaskReady.lh_Head; n->ln_Succ; n = n->ln_Succ)
++		ForeignMark((struct Task *)n);
++	for (n = SysBase->TaskWait.lh_Head; n->ln_Succ; n = n->ln_Succ)
++		ForeignMark((struct Task *)n);
++	Enable();
++	for (i = 0; i < numThreads; i++) {
++		ThreadInfo *inf = _threads[i];
++		if (inf->foreign == FOREIGN_LIVE && !inf->alive) {
++			D(bug("%s: foreign thread %ld (task %8lx) has ended\n", __FUNCTION__, i, inf->task));
++			inf->foreign = FOREIGN_REAPING;
++			inf->task = (struct Task *)-1;	// in no one's use, and not free yet
++			inf->reapnext = list;
++			list = inf;
++		}
++	}
++	return list;
++}
++
++/* Reclaim the records of foreign tasks that have ended. thread_sem not held. */
++static void ForeignSweep(void) {
++	ThreadInfo *list;
++
++	if (!numForeign)
++		return;
++	ObtainSemaphore(&thread_sem);
++	list = ForeignCollect();
++	ReleaseSemaphore(&thread_sem);
++	if (list)
++		ForeignReap(list);
++}
++
++static struct MemList *NewToken(void) {
++	struct MemList *ml = (struct MemList *)AllocMem(sizeof(struct MemList), MEMF_PUBLIC | MEMF_CLEAR);
++	ULONG *b;
++
++	if (!ml)
++		return NULL;
++	b = (ULONG *)AllocMem(3 * sizeof(ULONG), MEMF_PUBLIC);
++	if (!b) {
++		FreeMem(ml, sizeof(struct MemList));
++		return NULL;
++	}
++	b[0] = TOKEN_MAGIC;
++	b[1] = FALLBACK_SLOT;
++	b[2] = (ULONG)_threads;
++	ml->ml_Node.ln_Type = NT_MEMORY;
++	ml->ml_Node.ln_Pri = TOKEN_PRI;
++	ml->ml_NumEntries = 1;
++	ml->ml_ME[0].me_Addr = (APTR)b;
++	ml->ml_ME[0].me_Length = 3 * sizeof(ULONG);
++	return ml;
++}
++
++/* The calling task, which pthreads did not make, gets a record of its own; its
++   id, or 0 (the main thread) when the table is full or memory is short. */
++static pthread_t ForeignRegister(struct Task *task) {
++	struct MemList *token;
++	ThreadInfo *inf;
++	pthread_t slot;
++
++	// a task that was refused a record stays the main thread
++	if (FindToken(task, (long)FALLBACK_SLOT))
++		return 0;
++
++	token = NewToken();
++	if (!token)
++		return 0;	// no memory: the main thread, and asked again next time
++
++	// reclaim ended tasks' records first, so their slots are free for this one
++	ForeignSweep();
++	ObtainSemaphore(&thread_sem);
++	slot = FreeSlot();
++	if (slot == PTHREAD_THREADS_MAX) {
++		// table full: the main thread for this task's whole life (0008's answer)
++		D(bug("%s: no slot for task %8lx, it is the main thread\n", __FUNCTION__, task));
++		Forbid();
++		AddTail(&task->tc_MemEntry, &token->ml_Node);
++		Permit();
++		ReleaseSemaphore(&thread_sem);
++		return 0;
++	}
++	inf = GetThreadInfo(slot);
++	memset(inf, 0, sizeof(ThreadInfo));
++	pthread_attr_init(&inf->attr);
++	inf->attr.detachstate = PTHREAD_CREATE_DETACHED;	// nobody joins it
++	NEWLIST((struct List* )&inf->cleanup);
++	inf->cancelstate = PTHREAD_CANCEL_ENABLE;
++	inf->canceltype = PTHREAD_CANCEL_DEFERRED;
++	inf->started = 1;
++	inf->foreign = FOREIGN_LIVE;
++	((ULONG *)token->ml_ME[0].me_Addr)[1] = slot;
++	inf->token = token;
++	Forbid();
++	AddTail(&task->tc_MemEntry, &token->ml_Node);
++	Permit();
++	inf->task = task;	// last: the record is complete before GetThreadId can match it
++	numForeign++;
++	ReleaseSemaphore(&thread_sem);
++	D(bug("%s: task %8lx is foreign thread %ld\n", __FUNCTION__, task, slot));
++	return slot;
++}
++
++/* At exit: this program's tokens off the tasks still running (an ended task's
++   went with it), and every foreign record dropped. No destructors: the
++   program's code and data are about to go. */
++static void ForeignDrop(void) {
++	struct MinList gone;
++	struct Node *n, *t;
++	struct MemList *ml;
++	pthread_t i;
++	int k;
++
++	NEWLIST((struct List *)&gone);
++	ObtainSemaphore(&thread_sem);
++	Disable();
++	for (k = 0; k < 2; k++) {
++		for (t = (k ? SysBase->TaskWait : SysBase->TaskReady).lh_Head; t->ln_Succ; t = t->ln_Succ)
++			while ((ml = FindToken((struct Task *)t, -1))) {
++				Remove(&ml->ml_Node);
++				AddTail((struct List *)&gone, &ml->ml_Node);
++			}
++	}
++	while ((ml = FindToken(SysBase->ThisTask, -1))) {
++		Remove(&ml->ml_Node);
++		AddTail((struct List *)&gone, &ml->ml_Node);
++	}
++	Enable();
++	for (i = 0; i < numThreads; i++) {
++		ThreadInfo *inf = _threads[i];
++		if (inf->foreign) {
++			inf->foreign = 0;
++			inf->token = NULL;
++			inf->task = NULL;
++		}
++	}
++	numForeign = 0;
++	ReleaseSemaphore(&thread_sem);
++	while ((n = RemHead((struct List *)&gone)))
++		FreeEntry((struct MemList *)n);
++}
++#endif
++
+ //
+ // Thread specific data functions
+ //
+@@ -215,6 +548,9 @@ int pthread_key_create(pthread_key_t *key, void (*destructor)(void*)) {
+ 	if (key == NULL)
+ 		return EINVAL;
+ 
++#ifdef FOREIGN_RECORDS
++	ForeignSweep();		// reclaim the records of foreign tasks that have ended
++#endif
+ 	ObtainSemaphore(&tls_sem);
+ 
+ 	for (i = 0; i < numTlskeys; i++) {
+@@ -1595,39 +1931,18 @@ int pthread_create(pthread_t *thread, const pthread_attr_t *attr, void* (*start)
+ 	if (thread == NULL || start == NULL)
+ 		return EINVAL;
+ 
++#ifdef FOREIGN_RECORDS
++	ForeignSweep();		// reclaim the records of foreign tasks that have ended
++#endif
+ 	ObtainSemaphore(&thread_sem);
+ 
+-	// grab an empty thread slot
+-	threadnew = GetThreadId(NULL);
++	// grab an empty thread slot, growing the table if need be
++	threadnew = FreeSlot();
+ 	if (threadnew == PTHREAD_THREADS_MAX) {
+ 		ReleaseSemaphore(&thread_sem);
+ 		return EAGAIN;
+ 	}
+ 
+-	if (threadnew == numThreads) {
+-		// resize the thread's storage.
+-		unsigned n = numThreads + numThreads + 2;
+-
+-		D(bug("** %s(resize to %ld)\n", __FUNCTION__, n));
+-
+-		if (n > PTHREAD_THREADS_MAX)
+-			n = PTHREAD_THREADS_MAX;
+-
+-		if (n != numThreads) {
+-			unsigned i;
+-			for (i = numThreads; i < n; i++) {
+-				ThreadInfo *t = (ThreadInfo*) calloc(1, sizeof(ThreadInfo));
+-				if (!t) {
+-					numThreads = i;
+-					ReleaseSemaphore(&thread_sem);
+-					return EAGAIN;
+-				}
+-				_threads[i] = t;
+-			}
+-			numThreads = n;
+-		}
+-	}
+-
+ 	// prepare the ThreadInfo structure
+ 	inf = GetThreadInfo(threadnew);
+ 	memset(inf, 0, sizeof(ThreadInfo));
+@@ -1808,14 +2123,19 @@ pthread_t pthread_self(void) {
+ 
+ 	thread = GetThreadId(task);
+ 
+-	// A task pthreads did not make (the main task before pthreads knew it, an
+-	// SDL thread, a Workbench helper): the main thread's id, as AROS's
+-	// original meant. GetThreadId answers numThreads for a task it doesn't
+-	// know (pthread_create uses that to grow the table), never
+-	// PTHREAD_THREADS_MAX, so the old test never matched: pthread_self gave
+-	// an id with no ThreadInfo, and pthread_getspecific read NULL->tlsvalues.
+-	if (thread >= numThreads)
++	// A task pthreads did not make (an SDL thread, a Workbench helper):
++	// GetThreadId answers numThreads for a task it doesn't know (pthread_create
++	// uses that to grow the table), never PTHREAD_THREADS_MAX, so the old test
++	// never matched: pthread_self gave an id with no ThreadInfo, and
++	// pthread_getspecific read NULL->tlsvalues. Such a task gets a record of its
++	// own (0009); if it can't, it is the main thread, as AROS's original meant.
++	if (thread >= numThreads) {
++#ifdef FOREIGN_RECORDS
++		return ForeignRegister(task);
++#else
+ 		return 0;
++#endif
++	}
+ 
+ 	return thread;
+ }
+@@ -1935,8 +2255,9 @@ void pthread_exit(void *value_ptr) {
+ 		if (handler->routine)
+ 			handler->routine(handler->arg);
+ 
+-	// only for real threads.
+-	if (pid) {
++	// only for threads pthread_create made: a foreign task has no jump point and
++	// returns from here, as the main thread does.
++	if (pid && !inf->foreign) {
+ 		Forbid();
+ 		ReleaseSemaphore(&thread_sem);
+ 		longjmp(inf->jmp, 1);
+@@ -2246,10 +2567,17 @@ void __pthread_Exit_Func(void) {
+ 		// a thread might still be in creation!
+ 		ObtainSemaphore(&thread_sem);
+ 		ThreadInfo *inf = GetThreadInfo(i);
++		if (inf->foreign) {		// not ours to wait for (0009): dropped below
++			ReleaseSemaphore(&thread_sem);
++			continue;
++		}
+ 		inf->attr.detachstate = PTHREAD_CREATE_JOINABLE; // force it to be joinable or waiting may fail.
+ 		ReleaseSemaphore(&thread_sem);
+ 		ExitJoin(i);
+ 	}
++#ifdef FOREIGN_RECORDS
++	ForeignDrop();
++#endif
+ 
+ #endif
+ #ifdef __MORPHOS__

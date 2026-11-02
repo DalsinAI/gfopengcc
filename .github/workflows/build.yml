@@ -86,6 +86,7 @@ jobs:
             $CXX $FL -o "$O/$(basename "$t" .cpp)" "$t" -lpthread -latomic -lstdc++
           done
           "$PREFIX/bin/m68k-amigaos-gcc" -m68040 -m68881 -O2 -o "$O/setlocale_threads" tests/libnix/setlocale_threads.c -lpthread -lm
+          "$PREFIX/bin/m68k-amigaos-gcc" -m68040 -O2 -noixemul -o "$O/foreigntls" tests/pthreads/foreigntls.c -lpthread
           "$PREFIX/bin/m68k-amigaos-gcc" -m68040 -m68881 -O2 -o "$O/strtol_endptr" tests/libnix/strtol_endptr.c
           ls -l "$O"
 
