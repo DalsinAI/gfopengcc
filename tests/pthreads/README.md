@@ -31,7 +31,17 @@ m68k-amigaos-gcc -O2 -m68040 -noixemul -o exitpark exitpark.c -lpthread
 
 Run it on an Amiga whose trap handling parks a crashed task (GFOpenKick does; Kickstart's own shows a requester first), with `Run`, and check that the Shell gets `RC` back.
 
-`foreigntls.c` (`patches/aros-stuff/0008`): C `__thread` in three processes made with `CreateNewProc` and `NP_Entry`, as SDL2.module makes SDL threads. Each child must get the main thread's `__thread` block. With the stove's library (0001-0007) `pthread_getspecific` read `NULL->tlsvalues` and each child's block came out of low memory (0x000C6000 on GFOpenKick full21-t5); with 0008 every child prints "the main thread's" and the program prints `foreigntls OK` (rc 0).
+`foreigntls.c` (`patches/aros-stuff/0008` and `0009`): C `__thread` and a pthread key in processes made with `CreateNewProc` and `NP_Entry`, as SDL2.module makes SDL threads. It prints PASS or FAIL for each check, then `foreigntls OK` (rc 0) or `foreigntls FAILED` (rc 10):
+- `own`: three children alive at once each get an id of their own (not 0), a `__thread` block of their own (not the main thread's, in RAM, zeroed at first) and their own `pthread_setspecific` value, and none sees what another wrote;
+- `foreign`: a child's id is not joinable (`EINVAL`) or cancellable (`ESRCH`);
+- `dtors`: once the three have ended, a `pthread_key_create` (which sweeps) has run the key's destructor once for each child's value, and not before;
+- `reclaim`: ten more rounds of three reuse the same three records (ids 1-3, 33 children) and every destructor runs (33 of 33);
+- `thread`: a `pthread_create`'d thread still gets its own id and block;
+- `main`: the main thread is id 0 throughout, with its own block and key value unchanged.
+
+`foreigntls full` also fills the table: 2018 parked children each get a record (ids 1-2018); the next is refused one and is the main thread (id 0, the main thread's block), and stays so after the others have ended and their records are reclaimed; children started then get records of their own again. It needs about 20 MB.
+
+With the stove's library (0001-0007) each child's block came out of low memory (0x000C6000 on GFOpenKick full21-t5); with 0008 alone every child shares the main thread's block (`own` fails); with 0009 every check passes.
 
 ```bash
 m68k-amigaos-gcc -m68040 -O2 -noixemul -o foreigntls foreigntls.c -lpthread
