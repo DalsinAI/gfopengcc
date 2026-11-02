@@ -62,7 +62,7 @@ has emptied, and children started then get records again.
 zlib licence, as aros-stuff's pthreads (README, docs/install.md). Copyright (c) 2026 AmiCradle Team.
 ---
 diff --git a/pthreads/pthread.c b/pthreads/pthread.c
-index 8239498..9cdf4b9 100644
+index 8239498..d156bc6 100644
 --- a/pthreads/pthread.c
 +++ b/pthreads/pthread.c
 @@ -121,6 +121,10 @@ typedef struct {
@@ -183,7 +183,7 @@ index 8239498..9cdf4b9 100644
  	}
  
  	return i;
-@@ -202,6 +289,255 @@ static int __m68k_sync_val_compare_and_swap(int *v, int o, int n)
+@@ -202,6 +289,252 @@ static int __m68k_sync_val_compare_and_swap(int *v, int o, int n)
  #undef __sync_lock_test_and_set
  #endif
  
@@ -348,7 +348,7 @@ index 8239498..9cdf4b9 100644
 +   id, or 0 (the main thread) when the table is full or memory is short. */
 +static pthread_t ForeignRegister(struct Task *task) {
 +	struct MemList *token;
-+	ThreadInfo *inf, *reap;
++	ThreadInfo *inf;
 +	pthread_t slot;
 +
 +	// a task that was refused a record stays the main thread
@@ -359,8 +359,9 @@ index 8239498..9cdf4b9 100644
 +	if (!token)
 +		return 0;	// no memory: the main thread, and asked again next time
 +
++	// reclaim ended tasks' records first, so their slots are free for this one
++	ForeignSweep();
 +	ObtainSemaphore(&thread_sem);
-+	reap = ForeignCollect();
 +	slot = FreeSlot();
 +	if (slot == PTHREAD_THREADS_MAX) {
 +		// table full: the main thread for this task's whole life (0008's answer)
@@ -369,8 +370,6 @@ index 8239498..9cdf4b9 100644
 +		AddTail(&task->tc_MemEntry, &token->ml_Node);
 +		Permit();
 +		ReleaseSemaphore(&thread_sem);
-+		if (reap)
-+			ForeignReap(reap);
 +		return 0;
 +	}
 +	inf = GetThreadInfo(slot);
@@ -391,8 +390,6 @@ index 8239498..9cdf4b9 100644
 +	numForeign++;
 +	ReleaseSemaphore(&thread_sem);
 +	D(bug("%s: task %8lx is foreign thread %ld\n", __FUNCTION__, task, slot));
-+	if (reap)
-+		ForeignReap(reap);
 +	return slot;
 +}
 +
@@ -439,7 +436,7 @@ index 8239498..9cdf4b9 100644
  //
  // Thread specific data functions
  //
-@@ -215,6 +551,9 @@ int pthread_key_create(pthread_key_t *key, void (*destructor)(void*)) {
+@@ -215,6 +548,9 @@ int pthread_key_create(pthread_key_t *key, void (*destructor)(void*)) {
  	if (key == NULL)
  		return EINVAL;
  
@@ -449,7 +446,7 @@ index 8239498..9cdf4b9 100644
  	ObtainSemaphore(&tls_sem);
  
  	for (i = 0; i < numTlskeys; i++) {
-@@ -1595,39 +1934,18 @@ int pthread_create(pthread_t *thread, const pthread_attr_t *attr, void* (*start)
+@@ -1595,39 +1931,18 @@ int pthread_create(pthread_t *thread, const pthread_attr_t *attr, void* (*start)
  	if (thread == NULL || start == NULL)
  		return EINVAL;
  
@@ -494,7 +491,7 @@ index 8239498..9cdf4b9 100644
  	// prepare the ThreadInfo structure
  	inf = GetThreadInfo(threadnew);
  	memset(inf, 0, sizeof(ThreadInfo));
-@@ -1808,14 +2126,19 @@ pthread_t pthread_self(void) {
+@@ -1808,14 +2123,19 @@ pthread_t pthread_self(void) {
  
  	thread = GetThreadId(task);
  
@@ -521,7 +518,7 @@ index 8239498..9cdf4b9 100644
  
  	return thread;
  }
-@@ -1935,8 +2258,9 @@ void pthread_exit(void *value_ptr) {
+@@ -1935,8 +2255,9 @@ void pthread_exit(void *value_ptr) {
  		if (handler->routine)
  			handler->routine(handler->arg);
  
@@ -533,7 +530,7 @@ index 8239498..9cdf4b9 100644
  		Forbid();
  		ReleaseSemaphore(&thread_sem);
  		longjmp(inf->jmp, 1);
-@@ -2246,10 +2570,17 @@ void __pthread_Exit_Func(void) {
+@@ -2246,10 +2567,17 @@ void __pthread_Exit_Func(void) {
  		// a thread might still be in creation!
  		ObtainSemaphore(&thread_sem);
  		ThreadInfo *inf = GetThreadInfo(i);

@@ -36,6 +36,7 @@
  */
 #include <exec/types.h>
 #include <exec/memory.h>
+#include <exec/execbase.h>
 #include <dos/dostags.h>
 #include <proto/exec.h>
 #include <proto/dos.h>
@@ -116,6 +117,23 @@ static struct Process *start(void (*entry)(void), const char *name)
     return p;
 }
 
+/* Wait (up to 5 s) until no task of that name is left: a child signals as it
+   ends, but its process may take a moment more to go (dos's exit code). */
+static int gone(const char *name)
+{
+    int t;
+    for (t = 0; t < 250; t++) {
+        struct Task *left;
+        Forbid();
+        left = FindTask((STRPTR)name);
+        Permit();
+        if (!left) return 1;
+        Delay(1);
+    }
+    printf("  a \"%s\" task is still there after 5 s\n", name);
+    return 0;
+}
+
 static void waitfor(volatile int *count, int n, ULONG sig)
 {
     while (*count < n)
@@ -184,7 +202,7 @@ static int round_(int rnd, pthread_t *ids, int print)
     for (i = 0; i < NCHILD; i++)
         Signal(&procs[i]->pr_Task, SIGBREAKF_CTRL_F);
     waitfor(&ndone, NCHILD, donesig);
-    Delay(2);
+    gone("foreigntls child");
     for (i = 0; i < NCHILD; i++)
         if (!r[i].ok) {
             ok = 0;
@@ -226,6 +244,20 @@ static void parker(void)
     Signal(parent, donesig);
 }
 
+/* Tasks of that name on exec's lists. */
+static int CountTasks(const char *name)
+{
+    struct Node *nd;
+    int k = 0;
+    Forbid();
+    for (nd = SysBase->TaskWait.lh_Head; nd->ln_Succ; nd = nd->ln_Succ)
+        if (nd->ln_Name && !strcmp(nd->ln_Name, name)) k++;
+    for (nd = SysBase->TaskReady.lh_Head; nd->ln_Succ; nd = nd->ln_Succ)
+        if (nd->ln_Name && !strcmp(nd->ln_Name, name)) k++;
+    Permit();
+    return k;
+}
+
 static void full(void)
 {
     struct DateStamp t0, t1;
@@ -261,11 +293,14 @@ static void full(void)
     /* the others end and their records are reclaimed; then the refused one looks again */
     for (i = 0; i < refused; i++) Signal(&pproc[i]->pr_Task, SIGBREAKF_CTRL_C);
     waitfor(&ndone, refused, donesig);
-    Delay(10);
+    {                                   /* until only the refused one is left */
+        int t;
+        for (t = 0; t < 250 && CountTasks("foreigntls parker") > 1; t++) Delay(1);
+    }
     sweep();
     Signal(&pproc[refused]->pr_Task, SIGBREAKF_CTRL_C);
     waitfor(&ndone, refused + 1, donesig);
-    Delay(2);
+    gone("foreigntls parker");
     {
         int allok = 1;
         for (i = 0; i <= refused; i++) if (!pok[i]) allok = 0;
@@ -311,6 +346,8 @@ int main(int argc, char **argv)
         if (ok < 0) return 20;
         if (!ok) allok = 0;
         for (i = 0; i < NCHILD; i++) if ((int)ids[i] > maxid) maxid = ids[i];
+        if (ids[0] > NCHILD || ids[1] > NCHILD || ids[2] > NCHILD)
+            printf("  round %d: ids %lu %lu %lu\n", rnd, (unsigned long)ids[0], (unsigned long)ids[1], (unsigned long)ids[2]);
     }
     sweep();
     want = NCHILD * (ROUNDS + 1);
