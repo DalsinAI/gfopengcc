@@ -160,8 +160,8 @@ fi
 say checks
 CC="$PREFIX/bin/m68k-amigaos-gcc"
 C=$LOGS/check; mkdir -p "$C"
-"$CC" --version | head -1 | grep -Fq '(OpenAmigaGCC 16.2.0-open4)' || {
-  echo "gcc does not identify itself as OpenAmigaGCC 16.2.0-open4"; exit 1;
+"$CC" --version | head -1 | grep -Fq '(GFOpenAmigaGCC 16.2.0-open5)' || {
+  echo "gcc does not identify itself as GFOpenAmigaGCC 16.2.0-open5"; exit 1;
 }
 link_cpu=$("$CC" -dumpspecs | sed -n '/^\*link_cpu:/{n;p;q;}')
 case "$link_cpu" in

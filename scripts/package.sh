@@ -1,7 +1,7 @@
 #!/bin/bash
 # package.sh WORK PREFIX OUT VERSION
-# Makes a release from a finished build.sh run: OUT/openamigagcc-VERSION-x86_64-linux.tar.xz
-# (PREFIX without the NDK you supplied), OUT/openamigagcc-VERSION-src.tar.xz (amiga-gcc's
+# Makes a release from a finished build.sh run: OUT/gfopenamigagcc-VERSION-x86_64-linux.tar.xz
+# (PREFIX without the NDK you supplied), OUT/gfopenamigagcc-VERSION-src.tar.xz (amiga-gcc's
 # framework and its modules as built, with this repository) and OUT/SHA256SUMS.
 # It stops if either tarball would carry an NDK folder, an amiga.lib or a libamiga.a that is not
 # GFOpenNDK's (docs/openndk-libamiga.md).
@@ -9,7 +9,7 @@
 set -euo pipefail
 WORK=$(cd "$1" && pwd); PREFIX=$(cd "$2" && pwd); mkdir -p "$3"; OUT=$(cd "$3" && pwd); V=$4
 HERE=$(cd "$(dirname "$0")/.." && pwd)
-BIN=openamigagcc-$V-x86_64-linux; SRC=openamigagcc-$V-src
+BIN=gfopenamigagcc-$V-x86_64-linux; SRC=gfopenamigagcc-$V-src   # openamigagcc-* up to open4
 S=$(mktemp -d "$OUT/.stage.XXXXXX"); trap 'rm -rf "$S"' EXIT
 
 # The toolchain, without the NDK (m68k-amigaos/ndk, ndk-include, ndk13-include).

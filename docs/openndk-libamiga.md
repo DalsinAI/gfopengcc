@@ -35,7 +35,7 @@ software, and programs built with the toolchain carried their objects.
 16.2.0-open3 and open4 built GFOpenNDK for the 68040 only and put that build
 in every 68000-family folder, so a `-m68000` program calling RangeRand, ArgArrayInit or the
 other helpers got 68020 instructions (`mulu.l`, `tst.l An`, scaled
-indexes) and crashed on a 68000. From the next release each multilib has
+indexes) and crashed on a 68000. From open5 each multilib has
 its own.
 
 ## Not changed
