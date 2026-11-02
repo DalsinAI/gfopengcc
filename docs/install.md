@@ -1,6 +1,6 @@
 # Installing GFOpenAmigaGCC 16.2.0-open5
 
-GCC 16.2 for AmigaOS 3.x on 68k (`m68k-amigaos`), including AmigaOS 3.2.3, with binutils 2.46, libnix, libpthread, libgcc and libstdc++ (C++23), and the Team's fixes. It is built from bebbo's amiga-gcc line (GCC 16.2.0b) and runs on x86-64 Linux. For ARM64 Linux, use 16.2.0-open1's toolchain until a later ARM64 build is published.
+GCC 16.2 for AmigaOS 3.x on 68k (`m68k-amigaos`), including AmigaOS 3.2.3, with binutils 2.46, libnix, libpthread, libgcc and libstdc++ (C++23), and the Team's fixes. It is built from bebbo's amiga-gcc line (GCC 16.2.0b) and runs on x86-64 Linux. For ARM64 Linux, use 16.2.0-open1's toolchain until an ARM64 build of a later release is published.
 
 Programs it makes are AmigaOS 3.x hunk executables linked with libnix.
 
@@ -13,6 +13,8 @@ This release has no AmigaOS 4.1 (`ppc-amigaos`) compiler. The README's Systems t
 | `gfopenamigagcc-16.2.0-open5-x86_64-linux.tar.xz` | the toolchain for x86-64 Linux |
 | `gfopenamigagcc-16.2.0-open5-src.tar.xz` | the complete source, the patches and the scripts that built them |
 | `SHA256SUMS` | checksums of the two |
+
+Open5 is the first release under the GFOpen name. Open1 to open4 keep the names they were published with: the tarballs are `openamigagcc-16.2.0-openN-x86_64-linux.tar.xz` and `openamigagcc-16.2.0-openN-src.tar.xz`, the source tarball holds this repository as `openamigagcc/`, and `--version` says `OpenAmigaGCC 16.2.0-openN`. For one of them, use its names in the steps below.
 
 ## Install
 

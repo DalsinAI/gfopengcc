@@ -23,7 +23,7 @@ PREFIX=$("$X86/bin/m68k-amigaos-gcc" -v 2>&1 | sed -n 's/.*--prefix=\([^ ]*\).*/
 echo "== configured prefix $PREFIX (the toolchain is relocatable)"
 SRC=$WORK/projects
 B=$WORK/build-arm64; mkdir -p "$B"; STAGE=$B/stage; mkdir -p "$STAGE"
-LOGS=$WORK/openamigagcc-logs; mkdir -p "$LOGS"
+LOGS=$WORK/gfopenamigagcc-logs; mkdir -p "$LOGS"
 export PATH="$X86/bin:$PATH"     # the build -> target tools, for GCC's configure
 
 # 1. GMP, MPFR and MPC in-tree for the ARM64 host.

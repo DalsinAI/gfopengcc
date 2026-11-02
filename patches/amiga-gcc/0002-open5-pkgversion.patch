@@ -1,12 +1,12 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: SacredTrees <121399723+SacredTrees@users.noreply.github.com>
-Date: Mon, 2 Nov 2026 19:30:00 +0000
+Date: Mon, 19 Oct 2026 11:40:00 +0100
 Subject: [PATCH] gcc: identify the GFOpenAmigaGCC open5 release
 
 Put the release identity in GCC's own version output.  The open1/open2
 toolchains could only be distinguished by their containing folder, which
 made compiler provenance ambiguous once a prefix was copied into a stove.
-From open5 the identity carries the GF name (open4 and before said
+From open5 the identity carries the GFOpen name (open3 and open4 said
 "OpenAmigaGCC").
 ---
  Makefile | 2 +-
