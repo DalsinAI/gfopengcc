@@ -12,7 +12,7 @@ on:
   workflow_dispatch:
     inputs:
       release:
-        description: 'Publish this build as a release, e.g. 16.2.0-open5 (needs docs/releases/<version>.md); empty builds only'
+        description: 'Publish this build as a release, e.g. 16.2.0-open6 (needs docs/releases/<version>.md); empty builds only'
         required: false
         default: ''
 
@@ -66,6 +66,9 @@ jobs:
           tests/repro/prove.sh "$PREFIX/bin"
           tests/repro/prove.sh "$PREFIX/bin" -fno-tree-loop-distribute-patterns
 
+      - name: PR123853 (patches/gcc/0013) for m68k-amigaos, with the autoinc scanner
+        run: tests/autoinc/check.sh --amigaos "$PREFIX/bin"
+
       - name: Built libnix end-pointer control under qemu-m68k
         run: tests/libnix/endptr/run.sh "$PREFIX/bin"
 
@@ -115,8 +118,44 @@ jobs:
             ${{ env.WORK }}/gfopenamigagcc-logs
             ${{ env.WORK }}/log
 
+  # The m68k-aros target (from open6): stock GCC 16.2.0 with patches/aros/series.
+  # No AROS SDK here (it comes from an AROS build), so the compiler, binutils and
+  # collect-aros are built and the code checks compile and assemble only; the
+  # stove build on the Cradle machine adds libgcc, libstdc++ and libatomic.
+  aros:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 150
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Host tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq build-essential bison flex texinfo libgmp-dev libmpfr-dev libmpc-dev git curl python3
+
+      - name: Every GCC patch decided for m68k-aros
+        run: tests/aros-series.sh
+
+      - name: Fetch the m68k-aros sources
+        run: scripts/fetch-aros.sh "$RUNNER_TEMP/work"
+
+      - name: Build m68k-aros-gcc (compiler, binutils, collect-aros)
+        run: scripts/build-aros.sh "$RUNNER_TEMP/work" "$RUNNER_TEMP/aros" none "$(nproc)"
+
+      - name: PR123853 (patches/gcc/0013) for m68k-aros, with the autoinc scanner
+        run: tests/autoinc/check.sh --aros "$RUNNER_TEMP/aros"
+
+      - name: Logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: aros-logs
+          path: ${{ runner.temp }}/work/aros/logs
+
   release:
-    needs: build
+    needs: [build, aros]
     if: inputs.release != ''
     runs-on: ubuntu-24.04
     timeout-minutes: 30

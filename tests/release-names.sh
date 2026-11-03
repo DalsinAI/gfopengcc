@@ -22,6 +22,8 @@ pkg=$(sed -n 's/^+.*--with-pkgversion="\([^"]*\)".*/\1/p' "$p")
 v=${BASH_REMATCH[1]}; n=${BASH_REMATCH[2]}
 [ "$(basename "$p")" = "0002-open$n-pkgversion.patch" ] || fail "$(basename "$p") names another release than $v"
 grep -qxF "ID=\"$pkg\"" "$HERE/scripts/build.sh" || fail "scripts/build.sh does not check for ($pkg)"
+# from open6 the m68k-aros GCC (scripts/build-aros.sh) carries the same identity
+grep -qxF "ID=\"$pkg\"" "$HERE/scripts/build-aros.sh" || fail "scripts/build-aros.sh does not build ($pkg)"
 grep -qF 'BIN=gfopenamigagcc-$V-x86_64-linux; SRC=gfopenamigagcc-$V-src' "$HERE/scripts/package.sh" || fail "scripts/package.sh does not name the tarballs gfopenamigagcc-*"
 for f in 'gfopenamigagcc-$V-x86_64-linux.tar.xz' 'gfopenamigagcc-$V-src.tar.xz'; do
   grep -qF "\$RUNNER_TEMP/out/$f" "$HERE/.github/workflows/build.yml" || fail "the build workflow does not publish $f"

@@ -12,6 +12,8 @@
 #            libatomic is installed into SYSROOT/lib, so give it a copy of its own.
 #            "none": only the compiler, binutils and collect-aros (enough to compile
 #            and assemble; CI does this).
+# AROS_FROM=libatomic picks a build up again at step 6 (libatomic), with steps 1-5's
+# build folder and PREFIX as they were left.
 # Nothing is fetched.
 # GPL-3.0-or-later, like the patches it goes with. Copyright (c) 2026 AmiCradle Team.
 set -euo pipefail
@@ -30,8 +32,12 @@ else
   [ -d "$SR/include" ] && [ -d "$SR/lib" ] || { echo "$SR is not an AROS SDK (no include/ and lib/)"; exit 1; }
 fi
 
-# 1. AROS's diffs here are AROS's, unchanged, at the pinned commit.
 AROS=$A/AROS
+FROM=${AROS_FROM:-start}
+case $FROM in start|libatomic) ;; *) echo "AROS_FROM=$FROM: start or libatomic"; exit 1 ;; esac
+[ "$FROM" = start ] || [ "$FULL" = 1 ] || { echo "AROS_FROM=$FROM needs an AROS SDK"; exit 1; }
+if [ "$FROM" = start ]; then
+# 1. AROS's diffs here are AROS's, unchanged, at the pinned commit.
 cmp -s "$HERE/patches/aros/gcc/0001-gcc-16.2.0-aros.diff" "$AROS/tools/crosstools/gnu/gcc-16.2.0-aros.diff" ||
   { echo "patches/aros/gcc/0001 is not AROS's tools/crosstools/gnu/gcc-16.2.0-aros.diff at $(git -C "$AROS" rev-parse --short HEAD)"; exit 1; }
 cmp -s "$HERE/patches/aros/binutils/0001-binutils-2.47-aros.diff" "$AROS/tools/crosstools/gnu/binutils-2.47-aros.diff" ||
@@ -93,19 +99,25 @@ if [ "$FULL" = 1 ]; then
   say "libgcc and libstdc++ against $SR"
   ( cd "$B/gcc" && make -j"$JOBS" all && make -j1 install ) > "$LOGS/gcc-target.log" 2>&1 \
     || { echo "the target libraries failed (see $LOGS/gcc-target.log)"; exit 1; }
+fi
+fi   # AROS_FROM=start
+export PATH="$PREFIX:$PATH"
+if [ "$FULL" = 1 ]; then
 
   # 6. libatomic, as AROS's crosstools build makes it (configured on its own, with
-  #    AROS's target flags, one per multilib), into SYSROOT/lib.
+  #    AROS's target flags, one per multilib), into SYSROOT/lib. Its build folder is
+  #    where AROS puts it, in GCC's (TARGET/libatomic, the multilibs in
+  #    TARGET/MULTIDIR/libatomic), which its libtool install step expects.
   say "libatomic into $SR/lib"
-  mkdir -p "$B/libatomic"
-  ( cd "$B/libatomic" && CC="$PREFIX/$T-gcc" CCAS="$PREFIX/$T-gcc" AR="$PREFIX/$T-ar" RANLIB="$PREFIX/$T-ranlib" \
+  LA=$B/gcc/$T; rm -rf "$LA/libatomic" "$LA"/*/libatomic "$LA"/*/*/libatomic; mkdir -p "$LA/libatomic"
+  ( cd "$LA/libatomic" && CC="$PREFIX/$T-gcc" CCAS="$PREFIX/$T-gcc" AR="$PREFIX/$T-ar" RANLIB="$PREFIX/$T-ranlib" \
       CFLAGS="-msoft-float -fno-strict-aliasing -ffreestanding -fomit-frame-pointer -fbuiltin -Wno-pointer-sign -Wno-parentheses -Wno-volatile-register-var -Os" \
       CPPFLAGS="-DAROS_BUILD_TYPE=AROS_BUILD_TYPE_PERSONAL -DNOLIBINLINE" LDFLAGS="-msoft-float -L$SR/lib -s" \
       "$S/gcc-16.2.0/libatomic/configure" --prefix="$B/libatomic-prefix" --target=$T --build="$("$S/gcc-16.2.0/config.guess")" --host=$T \
       --without-pic --disable-shared --disable-nls --without-x && make -j"$JOBS" ) > "$LOGS/libatomic.log" 2>&1 \
     || { echo "libatomic failed (see $LOGS/libatomic.log)"; exit 1; }
   "$PREFIX/$T-gcc" -print-multi-lib | while IFS=';' read -r dir _; do
-    lb=$B/libatomic; [ "$dir" = . ] || lb=$B/libatomic/$dir
+    lb=$LA/libatomic; [ "$dir" = . ] || lb=$LA/$dir/libatomic
     [ -f "$lb/.libs/libatomic.a" ] || { echo "libatomic: no build for multilib '$dir'"; exit 1; }
     mkdir -p "$SR/lib/$dir"
     for f in libatomic.a libatomic_asneeded.a; do
@@ -124,7 +136,10 @@ printf 'int f(int *p, int n) { int s = 0; while (n--) s += *p++; return s; }\n' 
 if [ "$FULL" = 1 ]; then
   printf '#include <stdio.h>\nint main(void) { printf("hello\\n"); return 0; }\n' > "$C/hello.c"
   "$PREFIX/$T-gcc" -m68040 -O2 -o "$C/hello" "$C/hello.c"
-  "$PREFIX/$T-g++" -m68040 -O2 -std=c++23 -o "$C/hellocxx" -x c++ - <<'CXX'
+  # C++ as the aros68k-gcc16 stove's tests link it (libstdc++ locks through pthread, whose init
+  # entry only an early reference keeps); at the default CPU: with -m68040 libstdc++'s 68000
+  # objects want __divsi3, which no -m68040 libgcc has (the aros68k-gcc16 stove's too)
+  "$PREFIX/$T-g++" -O2 -std=c++23 -o "$C/hellocxx" -x c++ - -x none -Wl,-u,__pthread_Init_Func -lpthread -latomic <<'CXX'
 #include <vector>
 #include <algorithm>
 #include <cstdio>
