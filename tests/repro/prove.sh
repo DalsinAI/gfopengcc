@@ -142,4 +142,18 @@ for opt in -O1 -O2; do
   elif grep -q 'virtual-' "$O"/vregs.c.*.vregs; then echo "[$opt] vregs dump: WRONG (a virtual register is left after vregs)"; bad=1
   else echo "[$opt] vregs dump: right (no virtual register after vregs)"; fi
 done
+# -mcas (patches/gcc/0015): a 68040's 1-, 2- and 4-byte atomics as CAS inline,
+# with the right values; without -mcas, and on a 68000, they stay libatomic calls
+for opt in -O1 -O2 -Os; do
+  rm -f "$O/cas.o"
+  "$CC" -m68040 -mcas $opt "$@" -c "$D/cas.c" -o "$O/cas.o" && image cas && echo -n "[$opt -mcas] " && run cas cas || built "[$opt -mcas] cas"
+  if [ ! -f "$O/cas.o" ]; then built "[$opt -mcas] cas code"
+  elif "$OBJDUMP" -dr "$O/cas.o" | grep -q '__atomic'; then echo "[$opt -mcas] cas code: WRONG (a libatomic call is left)"; bad=1
+  elif [ "$("$OBJDUMP" -m m68k:68040 -d "$O/cas.o" | grep -cE 'cas[bwl]')" -lt 10 ]; then echo "[$opt -mcas] cas code: WRONG (fewer than 10 cas)"; bad=1
+  else echo "[$opt -mcas] cas code: right (cas inline, no libatomic call)"; fi
+done
+if "$CC" -m68040 -O2 "$@" -S -o - "$D/cas.c" | grep -q '___atomic_compare_exchange_4'; then echo "[-O2] cas default: right (libatomic calls without -mcas)"
+else echo "[-O2] cas default: WRONG (no libatomic call without -mcas)"; bad=1; fi
+if "$CC" -m68000 -mcas -O2 "$@" -S -o - "$D/cas.c" | grep -q '___atomic_compare_exchange_4'; then echo "[-O2 -m68000] cas: right (-mcas leaves a 68000 alone)"
+else echo "[-O2 -m68000] cas: WRONG (a 68000 has no CAS)"; bad=1; fi
 exit $bad

@@ -1,0 +1,57 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: SacredTrees <121399723+SacredTrees@users.noreply.github.com>
+Date: Tue, 3 Nov 2026 21:45:00 +0000
+Subject: [PATCH] amigaos: -mcas does atomics with CAS inline on a 68020 to
+ 68060
+
+bebbo's m68k.cc leaves FL_CAS out of every AmigaOS CPU ("no CAS on the
+AMIGA"): the chipset does not take CAS's locked read-modify-write cycle in
+Chip RAM.  So even -m68040 turns each C11/C++ atomic into a call into
+libatomic, whose AmigaOS build makes it atomic with Forbid() and Permit().
+
+-mcas, off by default, gives a 68020 to 68060 FL_CAS again, so sync.md's
+atomic_compare_and_swap patterns are used: CAS inline for 1, 2 and 4 bytes
+(the fetch-and-op forms become CAS loops), and 8 bytes stay libatomic
+calls.  A program asks for it when its atomics never live in Chip RAM, as
+GFOpenBrowser's (heap and data in Fast RAM).  Without -mcas, or on a
+68000/68010/CPU32, nothing changes.
+---
+ gcc/config/m68k/amigaos.opt |  4 ++++
+ gcc/config/m68k/m68k.cc     | 11 +++++++++++
+ 2 files changed, 15 insertions(+)
+
+diff --git a/gcc/config/m68k/amigaos.opt b/gcc/config/m68k/amigaos.opt
+--- a/gcc/config/m68k/amigaos.opt
++++ b/gcc/config/m68k/amigaos.opt
+@@ -55,3 +55,7 @@
+ resident32
+ Target Common Var(flag_resident,4)
+ data is addressed relative to a4 with 32 bit offsets, linked as resident
++
++mcas
++Target Var(m68k_amiga_cas) Init(0)
++Do 1, 2 and 4 byte atomic operations with CAS on a 68020 to 68060 (data never in Chip RAM)
+diff --git a/gcc/config/m68k/m68k.cc b/gcc/config/m68k/m68k.cc
+--- a/gcc/config/m68k/m68k.cc
++++ b/gcc/config/m68k/m68k.cc
+@@ -628,6 +628,17 @@
+ 
+   m68k_cpu_flags = entry->flags;
+ 
++#ifdef TARGET_AMIGAOS
++  /* -mcas: CAS for the 1-, 2- and 4-byte atomics on a 68020 to 68060, as
++     GCC does elsewhere.  It is off by default because the chipset does not
++     take CAS's locked read-modify-write cycle in Chip RAM; a program whose
++     atomics never live there asks for it.  */
++  if (m68k_amiga_cas
++      && (m68k_cpu_flags & FL_ISA_68020)
++      && (m68k_cpu_flags & FL_BITFIELD))
++    m68k_cpu_flags |= FL_CAS;
++#endif
++
+   /* Use the architecture setting to derive default values for
+      certain flags.  */
+   target_mask = 0;
+-- 
+2.53.0
+
