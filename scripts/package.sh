@@ -30,7 +30,7 @@ bad=$(cd "$S" && find . \( -path '*/projects/NDK3.2*' -o -name 'NDK3.2.lha' -o -
 [ -z "$bad" ] || { echo "NDK files in the release: $bad"; exit 1; }
 n=0
 while IFS= read -r a; do
-  "$PREFIX/bin/m68k-amigaos-ar" t "$a" | grep -qx rexxvar.o || { echo "${a#"$S"/} is not GFOpenNDK's libamiga.a"; exit 1; }
+  "$PREFIX/bin/m68k-amigaos-ar" t "$a" | grep -x rexxvar.o > /dev/null || { echo "${a#"$S"/} is not GFOpenNDK's libamiga.a"; exit 1; }
   n=$((n+1))
 done < <(find "$S" -name 'libamiga.a')
 echo "libamiga.a: $n in the release, all GFOpenNDK's"

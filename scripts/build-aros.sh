@@ -26,7 +26,8 @@ ID="GFOpenAmigaGCC 16.2.0-open6"
 T=m68k-aros
 say() { echo "== $*"; }
 if [ "$SYSROOT" = none ]; then
-  FULL=0; SR=$PREFIX/no-sysroot
+  # an empty one: GCC's fixincludes stops when the sysroot has no include folder
+  FULL=0; SR=$PREFIX/no-sysroot; mkdir -p "$SR/include" "$SR/lib"
 else
   FULL=1; SR=$(cd "$SYSROOT" && pwd)
   [ -d "$SR/include" ] && [ -d "$SR/lib" ] || { echo "$SR is not an AROS SDK (no include/ and lib/)"; exit 1; }
@@ -137,8 +138,8 @@ if [ "$FULL" = 1 ]; then
   printf '#include <stdio.h>\nint main(void) { printf("hello\\n"); return 0; }\n' > "$C/hello.c"
   "$PREFIX/$T-gcc" -m68040 -O2 -o "$C/hello" "$C/hello.c"
   # C++ as the aros68k-gcc16 stove's tests link it (libstdc++ locks through pthread, whose init
-  # entry only an early reference keeps); at the default CPU: with -m68040 libstdc++'s 68000
-  # objects want __divsi3, which no -m68040 libgcc has (the aros68k-gcc16 stove's too)
+  # entry only an early reference keeps), at the default CPU: a -m68040 C++
+  # link is left with __divsi3 undefined (the aros68k-gcc16 stove's too)
   "$PREFIX/$T-g++" -O2 -std=c++23 -o "$C/hellocxx" -x c++ - -x none -Wl,-u,__pthread_Init_Func -lpthread -latomic <<'CXX'
 #include <vector>
 #include <algorithm>

@@ -175,7 +175,7 @@ case "$link_cpu" in
 esac
 printf 'volatile unsigned long s;\nint main(void) { s = *(volatile unsigned long *)0; return 0; }\n' > "$C/nullread.c"
 "$CC" -O2 -c -o "$C/nullread.o" "$C/nullread.c"
-if "$PREFIX/bin/m68k-amigaos-objdump" -d "$C/nullread.o" | grep -qE 'trap +#7'; then echo "a read of address 0 still compiles to trap #7"; exit 1; fi
+if "$PREFIX/bin/m68k-amigaos-objdump" -d "$C/nullread.o" | grep -E 'trap +#7' > /dev/null; then echo "a read of address 0 still compiles to trap #7"; exit 1; fi
 printf '#include <stdio.h>\n#include <stdlib.h>\nint main(void) { char *p = calloc(4, 4); printf("hello %%d\\n", p ? p[3] : -1); free(p); return 0; }\n' > "$C/hello.c"
 "$CC" -O2 -o "$C/hello" "$C/hello.c" -Wl,-Map,"$C/hello.map"
 grep -q 'libnix' "$C/hello.map" || { echo "hello did not link libnix"; exit 1; }
@@ -207,10 +207,12 @@ while IFS= read -r a; do
 done < <(find "$PREFIX/m68k-amigaos/libnix/lib" -name libnix.a)
 echo "libnix: $n mem*/calloc objects checked; none calls itself or a block function"
 # Every libamiga.a is GFOpenNDK's (its rexxvar.o; Commodore's amiga.lib has no
-# such member), and each multilib links the one in its own folder.
+# such member), and each multilib links the one in its own folder. grep reads
+# all of ar's list (no -q): with pipefail, ar killed by SIGPIPE after an early
+# match failed the check at random (open6's first build, libb/libm020).
 n=0
 while IFS= read -r a; do
-  "$PREFIX/bin/m68k-amigaos-ar" t "$a" | grep -qx rexxvar.o || { echo "$a is not GFOpenNDK's libamiga.a"; exit 1; }
+  "$PREFIX/bin/m68k-amigaos-ar" t "$a" | grep -x rexxvar.o > /dev/null || { echo "$a is not GFOpenNDK's libamiga.a"; exit 1; }
   n=$((n+1))
 done < <(find "$PREFIX/m68k-amigaos" "$PREFIX/lib" -name 'libamiga.a' -not -path '*/ndk*')
 "$CC" -print-multi-lib | while IFS=';' read -r dir flags; do
