@@ -62,3 +62,19 @@ after `(An)+` or `-(An)`.
 GFOffice's libowf (its 41 sources, built as owf.library is): with patch 0013
 no instruction names a stepped register again, and the two that did are the
 only change in its code.
+
+## m68k-aros (from open6)
+
+The `aros68k-gcc16` stove (stock GCC 16.2.0 with AROS's diff) had the same bug:
+it compiled GFOpenKick's exec `oe_AlertText` (`exec_alert.c`, before
+amicradle-guest #582) at `-m68040 -O2` into `move.b (a1)+,(0,a1,d0.l)`. From
+open6 the `m68k-aros` compiler is built here with this patch
+([aros.md](aros.md)). `tests/autoinc/pr-autoinc.c` is that function reduced;
+`tests/autoinc/check.sh` compiles it and `tests/repro/autoinc.c` for both
+targets, every CPU, at `-O2`, `-O3` and `-Os`, and scans the code with
+amicradle-guest's `scan_autoinc_overlap.py` (copied into `tests/autoinc`).
+
+| Compiler | `pr-autoinc.c`, `-m68040 -O2` |
+| --- | --- |
+| `m68k-aros-gcc (GCC) 16.2.0` (the `aros68k-gcc16` stove) | wrong: `move.b (a0)+,(a0,d0.l)` |
+| `m68k-aros-gcc (GFOpenAmigaGCC 16.2.0-open6) 16.2.0` | right: `lea (a0,d0.l),a1` and `move.b (a0)+,(a1)`, the only change in its code |

@@ -52,6 +52,18 @@ no network at all, so a missing source stops it.
 Then `tests/repro/prove.sh PREFIX/bin` runs every reproducer (it needs
 `qemu-m68k`).
 
+## The m68k-aros target
+
+From open6 the same repository builds `m68k-aros-gcc` (AROS 68k) from stock
+GCC 16.2.0, AROS's diffs and `patches/aros/series`:
+
+```bash
+scripts/fetch-aros.sh WORK [TARBALLS]
+scripts/build-aros.sh WORK PREFIX AROS_SDK|none [JOBS]
+```
+
+See [aros.md](aros.md).
+
 ## CI
 
 `.github/workflows/build.yml` does all of this on every pull request and every

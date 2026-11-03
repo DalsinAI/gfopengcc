@@ -1,0 +1,95 @@
+From 6963d64db3db9c7ee8b63a188e502272914e1fc2 Mon Sep 17 00:00:00 2001
+From: SacredTrees <121399723+SacredTrees@users.noreply.github.com>
+Date: Tue, 3 Nov 2026 21:00:00 +0000
+Subject: [PATCH] m68k: a DImode shift by 32 pushed from a stack slot reads the
+ right word
+
+The split of (set (mem:DI (pre_dec sp)) (ashift:DI x 32)) pushes 0 and then
+the low word of x. When x is in a stack slot, (sp,N), the second push read
+(sp,N+4) as addressed before the first push, so it got the word 4 bytes
+below: the sign word instead of the value. GCC makes this push for a
+64-bit libcall argument such as (s64)m * 4294967296 / d (__divdi3) when
+tuning for the 68040 or 68060, without a frame pointer; GFOpenGPU's affine
+compositing came out wrong at -O1, -O2 and -Os with -m68040, -m68060 and
+-m68020 -mtune=68040.
+
+The source of the second push is now addressed past the first push. The
+matching split for a store of (lshiftrt:DI x 32) through a post-increment
+gets the same correction, the other way.
+
+patches/gcc/0008 for stock GCC 16.2.0 (the m68k-aros target): the same
+splits and the same function, which goes at the end of stock m68k.cc
+(bebbo's has m68k_preferred_doloop_mode there).
+---
+ gcc/config/m68k/m68k-protos.h |  1 +
+ gcc/config/m68k/m68k.cc       | 18 ++++++++++++++++++
+ gcc/config/m68k/m68k.md       |  7 +++++++
+ 3 files changed, 26 insertions(+)
+
+diff --git a/gcc/config/m68k/m68k-protos.h b/gcc/config/m68k/m68k-protos.h
+index abb8e9b06..4ce7c43f3 100644
+--- a/gcc/config/m68k/m68k-protos.h
++++ b/gcc/config/m68k/m68k-protos.h
+@@ -76,6 +76,7 @@ extern bool m68k_matches_q_p (rtx);
+ extern bool m68k_matches_u_p (rtx);
+ extern rtx legitimize_pic_address (rtx, machine_mode, rtx);
+ extern rtx m68k_legitimize_tls_address (rtx);
++extern rtx m68k_adjust_for_autoinc (rtx, rtx, int);
+ extern bool m68k_tls_reference_p (rtx, bool);
+ extern int valid_dbcc_comparison_p_2 (rtx, machine_mode);
+ extern rtx m68k_libcall_value (machine_mode);
+diff --git a/gcc/config/m68k/m68k.cc b/gcc/config/m68k/m68k.cc
+index ebd3f7dc7..b1a332229 100644
+--- a/gcc/config/m68k/m68k.cc
++++ b/gcc/config/m68k/m68k.cc
+@@ -7266,4 +7266,22 @@ m68k_use_lra_p ()
+   return m68k_lra_p;
+ }
+ 
++/* SRC is read after a store to DST, a MEM whose address is a pre-decrement
++   or post-increment of a register.  If SRC's address uses that register,
++   return SRC addressed DELTA bytes further, where the same memory is after
++   the register has moved; otherwise SRC.  Used by the splits that push or
++   store the two halves of a DImode shift by 32 one after the other.  */
++
++rtx
++m68k_adjust_for_autoinc (rtx src, rtx dst, int delta)
++{
++  if (!MEM_P (src) || !MEM_P (dst))
++    return src;
++  rtx a = XEXP (dst, 0);
++  if (GET_RTX_CLASS (GET_CODE (a)) != RTX_AUTOINC
++      || !reg_mentioned_p (XEXP (a, 0), XEXP (src, 0)))
++    return src;
++  return replace_equiv_address_nv (src, plus_constant (Pmode, XEXP (src, 0), delta));
++}
++
+ #include "gt-m68k.h"
+diff --git a/gcc/config/m68k/m68k.md b/gcc/config/m68k/m68k.md
+index b6ed03440..6c2b10e03 100644
+--- a/gcc/config/m68k/m68k.md
++++ b/gcc/config/m68k/m68k.md
+@@ -4526,6 +4526,10 @@
+ {
+   operands[0] = adjust_address(operands[0], SImode, 0);
+   operands[1] = gen_lowpart(SImode, operands[1]);
++  /* The zero is pushed first.  A source addressed through the register
++     being decremented (a push of a stack slot: (sp,N)) has moved 4 bytes
++     up by the time it is read.  */
++  operands[1] = m68k_adjust_for_autoinc (operands[1], operands[0], 4);
+ })
+ 
+ (define_split
+@@ -5068,6 +5072,9 @@
+ {
+   operands[0] = adjust_address(operands[0], SImode, 0);
+   operands[1] = gen_highpart(SImode, operands[1]);
++  /* The zero is stored first: a source addressed through the register
++     being incremented has moved 4 bytes down by the time it is read.  */
++  operands[1] = m68k_adjust_for_autoinc (operands[1], operands[0], -4);
+ })
+ 
+ (define_split
+-- 
+2.53.0
+

@@ -1,4 +1,4 @@
-# Installing GFOpenAmigaGCC 16.2.0-open5
+# Installing GFOpenAmigaGCC 16.2.0-open6
 
 GCC 16.2 for AmigaOS 3.x on 68k (`m68k-amigaos`), including AmigaOS 3.2.3, with binutils 2.46, libnix, libpthread, libgcc and libstdc++ (C++23), and the Team's fixes. It is built from bebbo's amiga-gcc line (GCC 16.2.0b) and runs on x86-64 Linux. For ARM64 Linux, use 16.2.0-open1's toolchain until an ARM64 build of a later release is published.
 
@@ -10,11 +10,11 @@ This release has no AmigaOS 4.1 (`ppc-amigaos`) compiler. The README's Systems t
 
 | File | What |
 | --- | --- |
-| `gfopenamigagcc-16.2.0-open5-x86_64-linux.tar.xz` | the toolchain for x86-64 Linux |
-| `gfopenamigagcc-16.2.0-open5-src.tar.xz` | the complete source, the patches and the scripts that built them |
+| `gfopenamigagcc-16.2.0-open6-x86_64-linux.tar.xz` | the toolchain for x86-64 Linux |
+| `gfopenamigagcc-16.2.0-open6-src.tar.xz` | the complete source, the patches and the scripts that built them |
 | `SHA256SUMS` | checksums of the two |
 
-Open5 is the first release under the GFOpen name. Open1 to open4 keep the names they were published with: the tarballs are `openamigagcc-16.2.0-openN-x86_64-linux.tar.xz` and `openamigagcc-16.2.0-openN-src.tar.xz`, the source tarball holds this repository as `openamigagcc/`, and `--version` says `OpenAmigaGCC 16.2.0-openN`. For one of them, use its names in the steps below.
+Open6 is the first published release under the GFOpen name (open5 was prepared but not published). Open1 to open4 keep the names they were published with: the tarballs are `openamigagcc-16.2.0-openN-x86_64-linux.tar.xz` and `openamigagcc-16.2.0-openN-src.tar.xz`, the source tarball holds this repository as `openamigagcc/`, and `--version` says `OpenAmigaGCC 16.2.0-openN`. For one of them, use its names in the steps below.
 
 ## Install
 
@@ -24,19 +24,19 @@ The toolchain needs glibc 2.38 or later (Ubuntu 24.04 or later, Debian 13 or lat
 1. Check and unpack the toolchain for your machine. It works from any folder; `/opt` is used here:
    ```bash
    sha256sum -c --ignore-missing SHA256SUMS
-   sudo tar -C /opt -xJf gfopenamigagcc-16.2.0-open5-x86_64-linux.tar.xz
-   export PATH=/opt/gfopenamigagcc-16.2.0-open5-x86_64-linux/bin:$PATH
+   sudo tar -C /opt -xJf gfopenamigagcc-16.2.0-open6-x86_64-linux.tar.xz
+   export PATH=/opt/gfopenamigagcc-16.2.0-open6-x86_64-linux/bin:$PATH
    ```
    Check it runs:
    ```bash
    m68k-amigaos-gcc --version
    ```
-   The first line is `m68k-amigaos-gcc (GFOpenAmigaGCC 16.2.0-open5) 16.2.0b 20260930174807`. A plain C program that uses only the C library already compiles here; programs that use the AmigaOS headers need the NDK from step 2.
+   The first line is `m68k-amigaos-gcc (GFOpenAmigaGCC 16.2.0-open6) 16.2.0b 20260930174807`. A plain C program that uses only the C library already compiles here; programs that use the AmigaOS headers need the NDK from step 2.
 2. **Add the AmigaOS 3.2 NDK.** It is not free software, so it is not included. Get `NDK3.2.lha` from Aminet (`dev/misc/NDK3.2.lha`), then let the source release put it in place (this needs `lha` from the lhasa package, a host C compiler, make, rsync and Perl):
    ```bash
-   tar -xJf gfopenamigagcc-16.2.0-open5-src.tar.xz
-   gfopenamigagcc-16.2.0-open5-src/gfopengcc/scripts/install-ndk.sh \
-       gfopenamigagcc-16.2.0-open5-src/amiga-gcc /opt/gfopenamigagcc-16.2.0-open5-x86_64-linux NDK3.2.lha
+   tar -xJf gfopenamigagcc-16.2.0-open6-src.tar.xz
+   gfopenamigagcc-16.2.0-open6-src/gfopengcc/scripts/install-ndk.sh \
+       gfopenamigagcc-16.2.0-open6-src/amiga-gcc /opt/gfopenamigagcc-16.2.0-open6-x86_64-linux NDK3.2.lha
    ```
    The NDK goes into `m68k-amigaos/ndk-include`, `m68k-amigaos/ndk13-include` and `m68k-amigaos/ndk` inside the toolchain folder.
 3. Optional developer headers, also not included: AHI (the `ahidev` archive on Aminet) and CyberGraphX (the CyberGraphX developer kit on Aminet). Copy their C `include` folders' contents into `m68k-amigaos/include`.
