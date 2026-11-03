@@ -1,0 +1,30 @@
+# The m68k-aros target's patch series, applied in this order by scripts/build-aros.sh.
+# One line per patch: the source tree it goes into (gcc or binutils), then its path
+# under patches/. Lines starting with "#" are notes.
+#
+# GCC: stock GCC 16.2.0 (scripts/aros.lock), then AROS's own diff, then the m68k
+# code generation fixes this repository carries for m68k-amigaos: the same files
+# where they apply as they are, a port where only their place in the file differs.
+#
+# Every patches/gcc/*.patch is named here, either as a line or in a "# not:" note
+# saying why it is m68k-amigaos only; tests/aros-series.sh checks that.
+binutils  aros/binutils/0001-binutils-2.47-aros.diff
+gcc       aros/gcc/0001-gcc-16.2.0-aros.diff
+gcc       gcc/0003-m68k-early-clobber-the-m68040-fix_trunc-scratch-regi.patch
+gcc       gcc/0005-fmalloc-memset-to-calloc-and-never-turn-calloc-s-own.patch
+gcc       aros/gcc/0008-stock-m68k-a-DImode-shift-by-32-pushed-from-a-stack-slot.patch
+gcc       gcc/0013-m68k-no-move-addresses-its-destination-through-the-r.patch
+gcc       gcc/0014-vregs-virtual-registers-inside-an-address-operand-ar.patch
+#
+# 0008 is ported: the same splits and the same function, which goes at the end of
+# stock m68k.cc (bebbo's m68k.cc ends with m68k_preferred_doloop_mode instead).
+#
+# not: 0001-amigaos-int32_t-is-int-no-mcrt-means-mcrt-nix20-stov.patch   m68kamigaos.h, the AmigaOS driver and libnix
+# not: 0002-libstdc-atomic.cc-wait-alignment-8-on-AmigaOS-stove-.patch   inside #ifdef __amigaos__ (hunk objects align to 8 at most); AROS is ELF
+# not: 0004-m68k-movmemsi-memmove-copies-overlapping-blocks-the-.patch   fixes bebbo's own movmemsi expander (m68k2.cc, bebbos-tweaks.md); stock GCC has no movmemsi, memmove stays a call
+# not: 0006-amigaos-safe-defaults-in-the-driver-null-checks-call.patch   AmigaOS driver defaults (m68kamigaos.h)
+# not: 0007-amigaos-resident-and-resident32-pick-the-base-relati.patch   AmigaOS multilibs (t-amigaos)
+# not: 0009-amigaos-loop-distribution-stays-on-by-default.patch          AmigaOS driver default (m68kamigaos.h); stock GCC has loop distribution on
+# not: 0010-amigaos-fuse-cxa-atexit-by-default-thread_local-dest.patch   AmigaOS/libnix (config.gcc's amigaos entry); AROS's own config decides
+# not: 0011-amigaos-EH-data-is-always-absolute-DW_EH_PE_absptr.patch     AmigaOS hunk relocations (m68kamigaos.h)
+# not: 0012-amigaos-m68040-soft-float-does-not-link-libm881.patch       AmigaOS multilib selection (m68kamigaos.h)

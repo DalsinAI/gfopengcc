@@ -1,0 +1,9 @@
+# GFOpenAmigaGCC's m68k-aros target: name  url  sha256 (a tarball) or commit (a git repository)  file or folder under WORK/aros
+# GCC and binutils are the GNU releases, checked by their SHA-256 (the aros68k-gcc16 stove's
+# were checked against the GNU keyring on 2 Oct 2026); isl is GCC's graphite library, built in
+# tree. AROS gives its GCC and binutils diffs (kept in patches/aros as they are there, and
+# compared with these by build-aros.sh) and collect-aros, AROS's linker driver.
+gcc       https://ftp.gnu.org/gnu/gcc/gcc-16.2.0/gcc-16.2.0.tar.xz        e6738e29597f733270731aa90600f37ffdc045079dfc27ec7e8192cc81085c3e  gcc-16.2.0.tar.xz
+binutils  https://ftp.gnu.org/gnu/binutils/binutils-2.47.tar.bz2          3068128c75cda9f898ccb4211d360246e8e195ffcc9dfb655b23ae23a54800e8  binutils-2.47.tar.bz2
+isl       https://libisl.sourceforge.io/isl-0.27.tar.xz                   6d8babb59e7b672e8cb7870e874f3f7b813b6e00e6af3f8b04f7579965643d5c  isl-0.27.tar.xz
+aros      https://github.com/aros-development-team/AROS.git               c8860e674d7c5fbab304e2bf201f7a9c81c98629                          AROS
