@@ -45,7 +45,7 @@ jobs:
       - name: Host tools
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq build-essential bison flex gperf texinfo \
+          sudo apt-get install -y -qq build-essential bison flex gperf texinfo install-info \
             libgmp-dev libmpfr-dev libmpc-dev rsync git lhasa autoconf gettext \
             libncurses-dev libreadline-dev qemu-user python3
 
