@@ -63,3 +63,29 @@ development overrides. AmigaOS/AROS/AC090 exception handling, C++ sanitizer
 behaviour and the broader ABI cases remain separate gates. GCC's aggregate
 trap setting disables C++ vptr instrumentation. This receipt does not claim
 ASan support, a sanitizer reporting runtime, or an Open7 release qualification.
+
+## Follow-up: clean compiler-core rebuild
+
+Patch 0017 was subsequently applied directly to the disposable Open7 source
+tree. The complete compiler core and C frontend were rebuilt and installed,
+instead of substituting the target macro at its call site:
+
+```sh
+cd /tmp/open7-gcc-build
+make -j8 all-gcc
+make install-gcc
+
+OUT=/tmp/open7-ubsan-trap-1 \
+  tests/ubsan-trap/check.py /tmp/open7-gcc-prefix/bin
+```
+
+The installed frontend identified itself as
+`GFOpenAmigaGCC 16.2.0-open7-dev`; its `cc1` SHA-256 was
+`12521b133ccf0363695d680834b1effbf8e93c73d3dac552fef997478f120077`.
+The result again was 120 cases and zero failures: 20 controls returned zero,
+100 invalid cases stopped with SIGILL, all four unsupported-mode controls were
+rejected, and no UBSan runtime reference was emitted.
+
+This closes the clean compiler-core rebuild caveat above. It does not replace
+the remaining clean end-to-end `scripts/build.sh` release build, real AmigaOS
+exception-path testing, or AC090 qualification.
