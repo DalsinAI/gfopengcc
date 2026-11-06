@@ -7,6 +7,8 @@
 # GFOpenNDK's (docs/openndk-libamiga.md).
 # GPL-3.0-or-later. Copyright (c) 2026 AmiCradle Team.
 set -euo pipefail
+# Package directory modes must not depend on the caller's umask.
+umask 022
 WORK=$(cd "$1" && pwd); PREFIX=$(cd "$2" && pwd); mkdir -p "$3"; OUT=$(cd "$3" && pwd); V=$4
 HERE=$(cd "$(dirname "$0")/.." && pwd)
 # Named gfopenamigagcc-* from open5; open1 to open4 were openamigagcc-*.
@@ -21,7 +23,7 @@ rsync -a --no-group --exclude '/m68k-amigaos/ndk/' --exclude '/m68k-amigaos/ndk-
 # The source: amiga-gcc and its modules as built (patches applied), and this repository.
 mkdir -p "$S/$SRC/amiga-gcc" "$S/$SRC/gfopengcc"
 rsync -a --no-group --exclude '.git' --exclude '/build-*/' --exclude '/download/' --exclude '/log/' \
-  --exclude '/gfopenamigagcc-logs/' --exclude '/openamigagcc-logs/' --exclude '/projects/NDK3.2*' --exclude '/projects/gfopensdk/OpenNDK/lib/build/' \
+  --exclude '/gfopenamigagcc-logs/' --exclude '/openamigagcc-logs/' --exclude '/.gfopenamigagcc-tmp/' --exclude '__pycache__' --exclude '*.pyc' --exclude '/projects/NDK3.2*' --exclude '/projects/gfopensdk/OpenNDK/lib/build/' \
   "$WORK/" "$S/$SRC/amiga-gcc/"
 rsync -a --no-group --exclude '.git' --exclude '__pycache__' "$HERE/" "$S/$SRC/gfopengcc/"
 
