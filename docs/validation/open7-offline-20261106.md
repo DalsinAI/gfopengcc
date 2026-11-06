@@ -49,7 +49,9 @@ target-library bytes matched, but 18 entries differed:
 Commit `21d8cd08debc1638aa10694fe2c0e8091ddc5939` fixes both steps. Rebuilding
 the affected components independently in both prefixes produced identical
 complete manifests, including file modes, symlinks and hashes. Both corrected
-prefixes again passed hardening links for all 17 multilibs. Raw differences
+prefixes again passed hardening links for all 17 multilibs. A Hunk-level
+comparison confirmed that all 34 runtime payloads (17 per run) were unchanged
+by removing the random member paths. Raw differences
 and original copies of all 18 affected files remain in
 `final-install-retry/` alongside the component rebuild logs.
 
