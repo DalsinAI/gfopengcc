@@ -97,3 +97,9 @@ checks all seventeen directories, exact library selection and a warning-free
 C++ link. That implementation still needs a clean full build before the AC090
 profile is qualified. The second reproducibility build and AmigaOS/AROS/AC090
 runtime evidence also remain release qualification work.
+
+The first empty-build-tree attempt with patch `0018` stopped before GCC when
+the host compiler exhausted the account quota on `/tmp`; fd2sfd's generated
+Makefile was truncated and binutils' MPFR probe consequently failed. Builds
+now place host temporary files inside their exclusively locked work folder.
+That aborted attempt is not clean-build evidence and must be restarted.

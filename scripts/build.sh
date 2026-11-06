@@ -15,6 +15,14 @@ command -v flock >/dev/null || { echo "flock is required to protect the build wo
 exec 9>"$WORK/.gfopenamigagcc-build.lock"
 flock -n 9 || { echo "another GFOpenAmigaGCC build is using $WORK"; exit 1; }
 mkdir -p "$PREFIX"; PREFIX=$(cd "$PREFIX" && pwd)
+# Host compilers and configure probes otherwise default to /tmp, which may
+# have a much smaller quota than the selected build volume. Keep their
+# temporary files inside the exclusively locked work folder unless the caller
+# deliberately supplied another TMPDIR.
+GFOPEN_TMPDIR=${TMPDIR:-$WORK/.gfopenamigagcc-tmp}
+mkdir -p "$GFOPEN_TMPDIR"
+GFOPEN_TMPDIR=$(cd "$GFOPEN_TMPDIR" && pwd)
+export TMPDIR=$GFOPEN_TMPDIR
 LOGS=$WORK/gfopenamigagcc-logs; mkdir -p "$LOGS"
 NOFETCH=""
 if unshare -n --map-current-user true 2>/dev/null; then NOFETCH="unshare -n --map-current-user"; fi

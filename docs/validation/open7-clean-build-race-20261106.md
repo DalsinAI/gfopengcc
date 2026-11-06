@@ -123,3 +123,17 @@ code definition of `__vfwprintf_total_size`. `scripts/build.sh` now stops if
 the target fails or either the shared library or static support archive is
 missing; `tests/libnix4-source-list.sh` preserves the source-list invariant.
 This repairs a limitation recorded in the Open2 through Open6 release notes.
+
+## Host temporary-directory failure
+
+The first empty-build-tree attempt after adding the dedicated 68040 multilibs
+stopped before GCC. The host compiler exhausted the account quota on `/tmp`
+while configuring fd2sfd: `config.status` could not finish its Makefile, and a
+parallel binutils configure then misreported the working host GCC and MPFR as
+unsupported. The build volume still had 18 GiB free, so this was not evidence
+of a source or compiler failure.
+
+`scripts/build.sh` now defaults `TMPDIR` to a directory inside its exclusively
+locked work folder while still honoring an explicit caller setting. The
+aborted build is retained as failure evidence and does not count as either
+required uninterrupted reproducibility build.
