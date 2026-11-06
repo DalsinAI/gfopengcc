@@ -69,6 +69,9 @@ jobs:
       - name: Optimiser correctness and code-size matrix
         run: OUT="$RUNNER_TEMP/optimizer" tests/optimizer/check.sh "$PREFIX/bin"
 
+      - name: Defined-behaviour optimiser differential fuzzing
+        run: OUT="$RUNNER_TEMP/optimizer-fuzz" python3 tests/optimizer/fuzz.py "$PREFIX/bin" 12
+
       - name: UBSan trap checks without a sanitizer runtime
         run: OUT="$RUNNER_TEMP/ubsan-trap" python3 tests/ubsan-trap/check.py "$PREFIX/bin"
 
