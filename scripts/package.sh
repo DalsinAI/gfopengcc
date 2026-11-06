@@ -42,5 +42,5 @@ while IFS= read -r a; do
 done < <(find "$S" -name 'libamiga.a')
 echo "libamiga.a: $n in the release, all GFOpenNDK's"
 
-( cd "$S" && tar --owner=0 --group=0 -cJf "$OUT/$BIN.tar.xz" "$BIN" && tar --owner=0 --group=0 -cJf "$OUT/$SRC.tar.xz" "$SRC" )
+( cd "$S" && tar --mode=u+rwX,go+rX,go-w --owner=0 --group=0 -cJf "$OUT/$BIN.tar.xz" "$BIN" && tar --mode=u+rwX,go+rX,go-w --owner=0 --group=0 -cJf "$OUT/$SRC.tar.xz" "$SRC" )
 ( cd "$OUT" && sha256sum "$BIN.tar.xz" "$SRC.tar.xz" > SHA256SUMS && cat SHA256SUMS )
