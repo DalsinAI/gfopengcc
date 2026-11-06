@@ -187,7 +187,7 @@ def main():
                 raise RuntimeError("clean-build precondition failed")
             run["status"] = "building"
             command(f"run {number}: full offline build",
-                    ["bash", orchestration / "scripts/build.sh", work, prefix, jobs],
+                    ["bash", orchestration / "scripts/build.sh", work, prefix, ndk, jobs],
                     record / "build.log")
             run["status"] = "regression"
             binary = prefix / "bin"
