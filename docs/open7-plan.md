@@ -103,3 +103,15 @@ the host compiler exhausted the account quota on `/tmp`; fd2sfd's generated
 Makefile was truncated and binutils' MPFR probe consequently failed. Builds
 now place host temporary files inside their exclusively locked work folder.
 That aborted attempt is not clean-build evidence and must be restarted.
+
+The already-patched retry completed all target libraries, the fatal libnix4
+gate and the seventeen stack-protector runtimes. Its first multilib check found
+that the ABI-compatible C-runtime seed covered `libm040` but not the nested
+hard-float `libm040/libm881` search directory. The seed now covers soft and
+hard float for plain, baserel and baserel32. The corrected integration prefix
+passes the warning-free pthread-heavy C++ link, both deterministic reproducer
+passes, 32 optimiser profiles, 192 generated differential cases, 120 UBSan
+trap cases, 24 autoincrement builds, lean C++, baserel EH, 110 libnix self-call
+checks, all per-multilib libamiga checks, fpuauto installation and provenance.
+This remains integration evidence rather than a clean-build receipt; the two
+clean offline builds and runtime qualification are still open.

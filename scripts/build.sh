@@ -128,26 +128,35 @@ done
 # The framework builds libnix and libpthread for 68020, whose ISA and ABI are
 # valid on 68040. GCC now builds CPU-sensitive target libraries in a dedicated
 # libm040 multilib; seed matching C-runtime folders so neither plain nor
-# base-relative links fall back to an incompatible directory. GFOpenNDK's
-# libamiga.a is replaced by a native per-multilib build in the next step.
+# base-relative links, with or without hard float, fall back to an incompatible
+# directory. GFOpenNDK's libamiga.a is replaced by a native per-multilib build
+# in the next step.
 say "68040 C runtime compatibility directories"
 T=$PREFIX/m68k-amigaos
 for root in "$T/lib" "$T/libnix/lib"; do
   for rel in libm020 libb/libm020 libb32/libm020; do
     src=$root/$rel
-    dst=$root/${rel/libm020/libm040}
     [ -d "$src" ] || { echo "missing 68020 runtime source directory $src"; exit 1; }
-    mkdir -p "$dst"
-    cp -a "$src/." "$dst/"
+    for suffix in '' /libm881; do
+      dst=$root/${rel/libm020/libm040}$suffix
+      mkdir -p "$dst"
+      cp -a "$src/." "$dst/"
+    done
   done
 done
 for f in \
   "$T/lib/libm040/libpthread.a" \
+  "$T/lib/libm040/libm881/libpthread.a" \
   "$T/lib/libb/libm040/libpthread.a" \
+  "$T/lib/libb/libm040/libm881/libpthread.a" \
   "$T/lib/libb32/libm040/libpthread.a" \
+  "$T/lib/libb32/libm040/libm881/libpthread.a" \
   "$T/libnix/lib/libm040/libnix.a" \
+  "$T/libnix/lib/libm040/libm881/libnix.a" \
   "$T/libnix/lib/libb/libm040/libnix.a" \
-  "$T/libnix/lib/libb32/libm040/libnix.a"; do
+  "$T/libnix/lib/libb/libm040/libm881/libnix.a" \
+  "$T/libnix/lib/libb32/libm040/libnix.a" \
+  "$T/libnix/lib/libb32/libm040/libm881/libnix.a"; do
   [ -s "$f" ] || { echo "68040 runtime seed did not produce $f"; exit 1; }
 done
 
