@@ -87,3 +87,35 @@ The compiler and target libraries came from an empty build/prefix reset, but
 the final collect-aros binary was corrected after that run. This is complete
 full-SDK integration evidence, not yet the uninterrupted clean receipt for the
 new eight-patch series. A clean rerun and AROS runtime execution remain open.
+
+## Uninterrupted clean offline full-SDK receipt
+
+The clean rerun completed successfully on 2026-11-06, from 20:29:06 to
+21:08:53 UTC, using the eight-patch AROS series. The isolated campaign is
+`open7-aros-offline-20261106`, with orchestration frozen at
+`45e57f6331c1644096828432bea053ba5991bebd` and `SOURCE_DATE_EPOCH=1793996935`.
+Both build and installed-prefix folders were empty before compilation. Four
+workers built binutils, collect-aros, GCC and all seven variants of libgcc,
+libstdc++ and libatomic. No compiler cache or earlier build outputs were reused.
+
+`scripts/qualify-aros-offline.py` enabled an inherited seccomp filter before
+source preparation: `socket` and `connect` return `ENETDOWN`. IPv4 and IPv6
+socket probes verified that the filter was active. Local pinned input archives
+and a fresh AROS checkout supplied the sources; an isolated dereferenced SDK
+copy prevented the build from modifying the original SDK. Its input manifest
+has SHA-256 `572b9bc457a8dba62af0c80db94e9b7bd119a3b80328bfcc8f20388267b8c1ad`.
+
+The uninterrupted invocation passed the 68040 C and C++/pthread/atomic SDK
+links, all seven multilib audits for the five integer helpers, accounting for
+all 18 GCC-patch decisions, and all 24 autoincrement compile/scan cases.
+The final hashes recorded in the campaign's `status.json` are:
+
+| Artifact | SHA-256 |
+| --- | --- |
+| gcc | `01f21a90693bdd062f20b9a9c7a72422cd1c713425a2e6689b9dcd373d14b166` |
+| cc1 | `9bc597592e73e4bbab6ca0c5aa8167cd5ef5c1247cd03e6d281b27ecb991542b` |
+| cc1plus | `3047c0ce57d21f7357777ce1221b8e6953378750b2a9dde9cc9028c664bebf4b` |
+| collect-aros | `455909bd32eea955256cb3a8df09065fb1281efe52d70a8debd6d9c020a1e01a` |
+
+This closes the clean full-SDK build gate. AROS target runtime execution
+remains open; successful cross-links are not a substitute for that evidence.

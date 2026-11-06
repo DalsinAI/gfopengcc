@@ -8,7 +8,7 @@ commits, with the patches in `patches/`.
 
 - An x86 or ARM64 Linux system with the usual GCC build tools (a C and C++
   compiler, make, bison, flex, gperf, texinfo, gmp/mpfr/mpc development
-  files, rsync, git, lhasa).
+  files, rsync, git, lhasa, install-info).
 - The AmigaOS 3.2 NDK archive, `NDK3.2.lha`, which you supply. It is not free
   software, so it is never fetched or kept here.
 - About 9 GB of disk and 45 minutes on 8 cores.
@@ -63,6 +63,33 @@ scripts/build-aros.sh WORK PREFIX AROS_SDK|none [JOBS]
 ```
 
 See [aros.md](aros.md).
+
+## Clean offline qualification
+
+Commit the recipe before launching either runner. Both runners freeze it in a
+separate checkout, disable compiler caches and reject network `socket` and
+`connect` calls using an inherited seccomp filter. They require Python 3,
+`libseccomp.so.2` and the ordinary host build tools. Socket-denial probes must
+pass before source preparation starts. Each record folder must be new.
+
+```bash
+python3 scripts/reproduce-offline.py RECORD_ROOT LOCAL_AMIGA_GCC_MIRROR /path/to/NDK3.2.lha 8
+python3 scripts/qualify-aros-offline.py AROS_RECORD_ROOT LOCAL_AROS_MIRROR COMPLETE_AROS_SDK 4
+```
+
+The native runner makes two sequential builds in the same absolute paths,
+starting each from fresh pinned source checkouts and empty build/prefix
+folders. It runs the regression suites, preserves installed manifests, creates
+binary/source archives with stable timestamps and compares both prefix
+contents and archive hashes. It checks for at least 12 GiB free before each
+build; allow additional room for retained prefixes, logs and archives.
+The AROS runner copies the SDK, verifies pinned input archives and performs
+one clean full-SDK build with all multilib/helper and autoincrement checks.
+
+Each campaign's `status.json` records its stage and failures. Native
+`comparison.json` records the complete prefix differences and archive hashes.
+These host/cross-link checks do not execute AmigaOS or AROS applications in
+their actual operating systems.
 
 ## CI
 

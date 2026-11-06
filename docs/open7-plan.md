@@ -60,68 +60,30 @@ list.
 
 ## Current development state
 
-Items 1–6 have candidate implementations and host-side validation receipts.
-That includes the deterministic cost model, AROS helper coverage,
-multicore-safe `fpuauto`, all four stack-protector modes, an explicit
-`-fhardened` diagnostic, trap-mode UBSan, the 32-profile optimiser matrix and
-192 defined-behaviour differential executions.
+The deterministic cost model, installed provenance, multicore-safe fpuauto,
+stack-protector runtime, explicit unsupported `-fhardened` diagnostic and
+trap-mode UBSan have candidate implementations with host/QEMU receipts.
+Native validation covers seventeen target-library variants, warning-free
+68040/hard-float C++ links, 32 optimiser profiles, 192 generated differential
+cases, 120 UBSan trap cases, 24 autoincrement builds and the existing libnix,
+lean C++ and base-relative exception suites. The shared libnix4 installation
+is a fatal build gate and now passes.
 
-The first item 7 clean integration attempt exposed two build-system gaps: the
-work folder admitted concurrent builds, and OpenNDK's per-multilib library
-builder passed a hardcoded `-m68040` before the selected CPU while compiling
-1,303 objects serially. Open7 now has an exclusive work-folder lock and a
-provenanced GFOpenNDK patch that selects one CPU and uses bounded parallel
-compilation. The corrected integration completed from the fresh source work
-folder and passed the host/QEMU regression matrices.
+The clean AROS full-SDK offline rerun passed uninterrupted on 2026-11-06:
+GCC, collect-aros, all seven libgcc/libstdc++/libatomic variants, the 68040
+C++/pthread/atomic link, integer-helper audits and 24 autoincrement scans.
+See [the AROS receipt](validation/open7-aros-libgcc-20261106.md).
 
-The same integration exposed a long-standing `libnix4.library` failure that
-earlier builds ignored. A misspelled object exclusion admitted two
-`__vfwprintf_total_size` implementations. Patch `0009` corrects the list, the
-shared library now links and installs, and a missing or failed libnix4 target
-is fatal to the build.
+Two native offline compilations completed. The second required a validation
+reader correction for SIGPIPE. Comparing their 4,470-entry installed prefixes
+then exposed random Hunk member paths in seventeen SSP archives and a racy
+Info index. Correcting and independently rebuilding those components made
+the complete prefixes identical. A fresh pair using the fixed recipe from
+the outset is running as `open7-offline-repro-20261106-r3`; the repaired pair
+is not counted as two uninterrupted full-script passes. See
+[the offline campaign receipt](validation/open7-offline-20261106.md).
 
-A fresh Open7 AROS compiler bootstrap has also completed from the pinned GCC,
-binutils, isl and AROS commits. All seven selected AROS patches applied and 24
-autoincrement combinations passed. Because that build intentionally had no
-AROS SDK, the full target libraries and runtime qualification remain open.
-
-Compiling the AmigaOS runtime payloads then exposed a further AC090 gap:
-`-m68040 -m68881` currently selects the `68020 + 68881` libstdc++ multilib.
-Equivalent inline COMDAT code can therefore differ byte-for-byte (`addaw`
-versus `lea` for the same stack adjustment), which makes the hunk linker emit
-duplicate-section warnings. Patch `0018` now defines six dedicated 68040
-variants while deliberately keeping compatibility-range targets on 68020;
-ABI-compatible 68020 C runtimes are installed into matching 68040 directories
-while GCC builds the CPU-sensitive libraries for 68040. The regression gate
-checks all seventeen directories, exact library selection and a warning-free
-C++ link. That implementation still needs a clean full build before the AC090
-profile is qualified. The second reproducibility build and AmigaOS/AROS/AC090
-runtime evidence also remain release qualification work.
-
-The first empty-build-tree attempt with patch `0018` stopped before GCC when
-the host compiler exhausted the account quota on `/tmp`; fd2sfd's generated
-Makefile was truncated and binutils' MPFR probe consequently failed. Builds
-now place host temporary files inside their exclusively locked work folder.
-That aborted attempt is not clean-build evidence and must be restarted.
-
-The already-patched retry completed all target libraries, the fatal libnix4
-gate and the seventeen stack-protector runtimes. Its first multilib check found
-that the ABI-compatible C-runtime seed covered `libm040` but not the nested
-hard-float `libm040/libm881` search directory. The seed now covers soft and
-hard float for plain, baserel and baserel32. The corrected integration prefix
-passes the warning-free pthread-heavy C++ link, both deterministic reproducer
-passes, 32 optimiser profiles, 192 generated differential cases, 120 UBSan
-trap cases, 24 autoincrement builds, lean C++, baserel EH, 110 libnix self-call
-checks, all per-multilib libamiga checks, fpuauto installation and provenance.
-This remains integration evidence rather than a clean-build receipt; the two
-clean offline builds and runtime qualification are still open.
-
-A clean AROS compiler/target-library build against an isolated complete SDK
-also completed all seven libgcc, libstdc++ and libatomic variants. Its final
-C++ gate exposed a host-only quota defect: collect-aros ignored `TMPDIR` and
-always wrote a large intermediate link below `/tmp`. The AROS patch series now
-makes collect-aros honor `TMPDIR`, and the AROS build supplies a work-folder
-default. Rebuilding that host tool made the 68040 C++/pthread/atomic link pass;
-all seven helper audits and 24 autoincrement cases pass. Because the host tool
-was corrected after the clean target-library run, one uninterrupted clean
-rerun of the eight-patch AROS series and AROS runtime execution are still open.
+AmigaOS, AROS and AC090 runtime qualification, the broader ABI execution
+corpus, deliberate stack-canary corruption and representative AC090 runtime/
+size measurements remain open. No optimisation default or release readiness
+claim is justified by the offline compiler checks alone.
