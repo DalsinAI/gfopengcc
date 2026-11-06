@@ -12,7 +12,7 @@ TMPDIR when it is nonempty, retaining /tmp as the compatibility fallback.
  1 file changed, 20 insertions(+), 5 deletions(-)
 
 diff --git a/misc.c b/misc.c
-index ea2acbd..0000000 100644
+index ea2acbd..1111111 100644
 --- a/misc.c
 +++ b/misc.c
 @@ -94,19 +94,35 @@
