@@ -14,9 +14,9 @@ SIGILL, not merely crash with another signal. No object may reference a
 UBSan handler. Runtime-dependent and partially trapped modes must still be
 rejected by the compiler.
 
-The raw executable harness supplies Linux syscalls for QEMU. It links ordinary
-integer arithmetic helpers from libnix13 and libgcc, without AmigaOS startup
-or a sanitizer library. This verifies compiler instrumentation, not AmigaOS
+The raw executable harness supplies Linux syscalls for QEMU and a small
+freestanding integer-division helper, without AmigaOS startup, target
+libraries or a sanitizer library. This verifies compiler instrumentation, not AmigaOS
 exception handling or AC090 runtime behaviour. The FPU profile selects the
 floating-point ABI; these integer probes do not test floating-point checks.
 

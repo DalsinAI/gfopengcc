@@ -34,14 +34,14 @@ rejected. This is an application opt-in; release defaults do not change.
   ASan even with trap-all, TSan, and a partially trapped UB selection were
   all rejected.
 - No instrumented object referred to a UBSan handler. The raw QEMU harness
-  linked ordinary integer helpers from libnix13/libgcc, with no sanitizer
+  linked a freestanding division helper, with no target library, sanitizer
   runtime or AmigaOS startup. The 68040 FPU profile checks option/ABI
   compatibility of these integer probes, not floating-point instrumentation.
 
 Command:
 
 ```sh
-OUT=/tmp/open7-ubsan-pass-20261106 \
+OUT=/tmp/open7-ubsan-committed-20261106 \
 python3 tests/ubsan-trap/check.py /tmp/tmp.fYlQ2a4xsT/prefix/bin \
   -B/tmp/open7-ubsan-candidate/ -B/tmp/open7-resume-tools/ \
   -specs=/tmp/open7-specs -fno-use-linker-plugin
