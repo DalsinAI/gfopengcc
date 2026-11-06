@@ -1,0 +1,20 @@
+Subject: [PATCH] amigaos: allow undefined-behaviour checks in trap mode
+
+Keep runtime-dependent sanitizers unsupported. Permit only UBSan checks
+whose enabled bits all use traps, including the aggregate trap setting
+that disables vptr instrumentation in GCC.
+
+--- a/gcc/config/m68k/amigaos.h
++++ b/gcc/config/m68k/amigaos.h
+@@ -184,7 +184,10 @@
+     if ((flag_pic == 1 || flag_pic == 2) && !TARGET_PCREL)		\
+       warning (0, "%'-fpic%', %'-fPIC%' and %'-fpie%' are not supported on " \
+ 	     "this target, use %'-fbaserel%' instead");			\
+-    if (flag_sanitize)							\
++    /* UBSan checks can use inline traps without a target runtime.  */ \
++    if ((flag_sanitize & ~(SANITIZE_UNDEFINED                         \
++                           | SANITIZE_UNDEFINED_NONDEFAULT))          \
++        || (flag_sanitize & ~flag_sanitize_trap))							\
+       error ("%<-fsanitize%> is not supported on this target");		\
+   }									\
+ while (0)

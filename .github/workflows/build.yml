@@ -69,6 +69,16 @@ jobs:
       - name: Optimiser correctness and code-size matrix
         run: OUT="$RUNNER_TEMP/optimizer" tests/optimizer/check.sh "$PREFIX/bin"
 
+      - name: UBSan trap checks without a sanitizer runtime
+        run: OUT="$RUNNER_TEMP/ubsan-trap" python3 tests/ubsan-trap/check.py "$PREFIX/bin"
+
+      - name: Keep UBSan trap evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ubsan-trap-evidence
+          path: ${{ runner.temp }}/ubsan-trap/
+
       - name: PR123853 (patches/gcc/0013) for m68k-amigaos, with the autoinc scanner
         run: tests/autoinc/check.sh --amigaos "$PREFIX/bin"
 
