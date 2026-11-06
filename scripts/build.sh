@@ -241,5 +241,11 @@ printf '#include <proto/exec.h>\n#include <clib/alib_protos.h>\nint main(void) {
 grep -q 'gfopensdk/OpenNDK\|libamiga.a(newlist.o)' "$C/alib.map" || { echo "a NewList program did not link GFOpenNDK's libamiga.a"; exit 1; }
 echo "libamiga.a: $n copies, all GFOpenNDK's; every multilib links its own"
 echo "defaults: $("$CC" -### -c -x c /dev/null 2>&1 | grep -o -- '-fno-[a-z-]*' | sort -u | tr '\n' ' ')"
+say "multicore-safe fpuauto"
+FPUAUTO=$WORK/projects/amicradle-guest/common/fpuauto
+[ -x "$FPUAUTO/install-prefix.sh" ] || {
+  echo "missing fpuauto installer at $FPUAUTO/install-prefix.sh"; exit 1;
+}
+"$FPUAUTO/install-prefix.sh" "$PREFIX" "$WORK/build-fpuauto"
 "$HERE/scripts/install-provenance.sh" "$WORK" "$PREFIX"
 echo "GFOpenAmigaGCC built in $PREFIX"

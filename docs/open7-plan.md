@@ -26,7 +26,8 @@ the comparison baseline.
 
 ### Runtime safety and hardening
 
-- `fpuauto` uses a multicore-safe data dispatch path and never modifies code.
+- `fpuauto` uses a multicore-safe data dispatch path and never modifies code;
+  the compiler build pins, installs and validates that source.
 - `-fstack-protector-strong` has a libnix guard and failure path.
 - `-fhardened` selects only supported Amiga protections or stops with one
   clear diagnostic.
