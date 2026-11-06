@@ -66,6 +66,9 @@ jobs:
           tests/repro/prove.sh "$PREFIX/bin"
           tests/repro/prove.sh "$PREFIX/bin" -fno-tree-loop-distribute-patterns
 
+      - name: Optimiser correctness and code-size matrix
+        run: OUT="$RUNNER_TEMP/optimizer" tests/optimizer/check.sh "$PREFIX/bin"
+
       - name: PR123853 (patches/gcc/0013) for m68k-amigaos, with the autoinc scanner
         run: tests/autoinc/check.sh --amigaos "$PREFIX/bin"
 
