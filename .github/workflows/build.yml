@@ -100,6 +100,9 @@ jobs:
       - name: Base-relative C++ exception data
         run: tests/baserel/eh-check.sh "$PREFIX"
 
+      - name: Dedicated 68040 AmigaOS multilibs
+        run: tests/amigaos-multilib.sh "$PREFIX"
+
       - name: Compile the AmigaOS-only tests
         run: |
           set -e

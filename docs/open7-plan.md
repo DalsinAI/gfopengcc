@@ -89,7 +89,11 @@ Compiling the AmigaOS runtime payloads then exposed a further AC090 gap:
 `-m68040 -m68881` currently selects the `68020 + 68881` libstdc++ multilib.
 Equivalent inline COMDAT code can therefore differ byte-for-byte (`addaw`
 versus `lea` for the same stack adjustment), which makes the hunk linker emit
-duplicate-section warnings. Open7 needs a dedicated 68040 multilib, or another
-demonstrably safe warning-free design, before the AC090 profile is qualified.
-An uninterrupted clean build, the second reproducibility build and
-AmigaOS/AROS/AC090 runtime evidence also remain release qualification work.
+duplicate-section warnings. Patch `0018` now defines six dedicated 68040
+variants while deliberately keeping compatibility-range targets on 68020;
+ABI-compatible 68020 C runtimes are installed into matching 68040 directories
+while GCC builds the CPU-sensitive libraries for 68040. The regression gate
+checks all seventeen directories, exact library selection and a warning-free
+C++ link. That implementation still needs a clean full build before the AC090
+profile is qualified. The second reproducibility build and AmigaOS/AROS/AC090
+runtime evidence also remain release qualification work.

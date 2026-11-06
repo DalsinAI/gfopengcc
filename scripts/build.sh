@@ -117,14 +117,39 @@ for f in bin/m68k-amigaos-gprof m68k-amigaos/ndk-include/exec/types.h m68k-amiga
   [ -e "$PREFIX/$f" ] || { echo "the amiga-gcc build did not install $f (see $LOGS/make.log and $WORK/log)"; exit 1; }
 done
 
+# The framework builds libnix and libpthread for 68020, whose ISA and ABI are
+# valid on 68040. GCC now builds CPU-sensitive target libraries in a dedicated
+# libm040 multilib; seed matching C-runtime folders so neither plain nor
+# base-relative links fall back to an incompatible directory. GFOpenNDK's
+# libamiga.a is replaced by a native per-multilib build in the next step.
+say "68040 C runtime compatibility directories"
+T=$PREFIX/m68k-amigaos
+for root in "$T/lib" "$T/libnix/lib"; do
+  for rel in libm020 libb/libm020 libb32/libm020; do
+    src=$root/$rel
+    dst=$root/${rel/libm020/libm040}
+    [ -d "$src" ] || { echo "missing 68020 runtime source directory $src"; exit 1; }
+    mkdir -p "$dst"
+    cp -a "$src/." "$dst/"
+  done
+done
+for f in \
+  "$T/lib/libm040/libpthread.a" \
+  "$T/lib/libb/libm040/libpthread.a" \
+  "$T/lib/libb32/libm040/libpthread.a" \
+  "$T/libnix/lib/libm040/libnix.a" \
+  "$T/libnix/lib/libb/libm040/libnix.a" \
+  "$T/libnix/lib/libb32/libm040/libnix.a"; do
+  [ -s "$f" ] || { echo "68040 runtime seed did not produce $f"; exit 1; }
+done
+
 # 5b. libamiga.a, from GFOpenNDK (projects/gfopensdk, pinned in
 #     scripts/sources.lock), in every multilib folder, each built with that
-#     multilib's own flags: "libm020/libm881;@mcpu=68020@m68881" gets
-#     -mcpu=68020 -m68881, "libb;@fbaserel" -fbaserel. GFOpenNDK's lib/build.sh puts
-#     -m68040 first, so a multilib that names no CPU gets -m68000 (this
-#     GCC's default) after it: the last CPU flag wins. Each old file is
-#     removed first, so a link to it (a stove's) is replaced, never written
-#     through. docs/openndk-libamiga.md.
+#     multilib's own flags: "libm040/libm881;@mcpu=68040@m68881" gets
+#     -mcpu=68040 -m68881 and "libb;@fbaserel" gets -m68000 -fbaserel.
+#     A multilib that names no CPU receives explicit -m68000 (this GCC's
+#     default). Each old file is removed first, so a link to it (a stove's) is
+#     replaced, never written through. docs/openndk-libamiga.md.
 say "libamiga.a from GFOpenNDK"
 OPENNDK=$WORK/projects/gfopensdk/OpenNDK
 T=$PREFIX/m68k-amigaos
@@ -185,6 +210,7 @@ ID="GFOpenAmigaGCC 16.2.0-open7"
 }
 "$HERE/tests/cost-model/check.sh" "$PREFIX/bin"
 "$HERE/tests/hardening/check.sh" "$PREFIX/bin"
+"$HERE/tests/amigaos-multilib.sh" "$PREFIX"
 link_cpu=$("$CC" -dumpspecs | sed -n '/^\*link_cpu:/{n;p;q;}')
 case "$link_cpu" in
   *'mhard-float|m68881|mcpu=6804'* )
