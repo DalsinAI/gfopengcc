@@ -7,7 +7,7 @@ commits, with the patches in `patches/`.
 ## What it needs
 
 - An x86 or ARM64 Linux system with the usual GCC build tools (a C and C++
-  compiler, make, bison, flex, gperf, texinfo, gmp/mpfr/mpc development
+  compiler, make, bison, flex, gperf, autoconf, texinfo, gmp/mpfr/mpc development
   files, rsync, git, lhasa, install-info).
 - The AmigaOS 3.2 NDK archive, `NDK3.2.lha`, which you supply. It is not free
   software, so it is never fetched or kept here.

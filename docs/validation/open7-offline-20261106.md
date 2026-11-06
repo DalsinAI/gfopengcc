@@ -67,6 +67,26 @@ executing it. The failed log remains preserved; the replacement uses the
 immutable `packaging-frozen/` checkout. This packaging error is separate from
 the compiled outputs and passed regressions.
 
+The first corrected binary archives match at SHA-256
+`0bf5a4d5072d9ee6f470bd3a65ace3f9f20504ccde69c64d09318f330038695d`.
+Their source archives initially differed in six entries, all under
+`projects/fd2sfd`: one build's checkout timestamps triggered automatic
+regeneration of the tracked Autoconf 2.52 `configure` script using host
+Autoconf 2.72. The other retained the tracked script. The remaining five
+entries were the generated cache directory/files and `configure~` backup.
+
+Commit `c288ff1` makes Autoconf regeneration an explicit build step and omits
+its temporary cache/backup from packaging. Applying this preparation to both
+source payloads produced the same `configure` SHA-256:
+`48b66cb08a357efd91d69ba08c3203e211f413bdeaa330f170e3beda274b54c9`.
+Fresh out-of-tree fd2sfd configure/compile runs produced identical host tools,
+also matching both original installed binaries at SHA-256
+`0a3a2e5145114a3566681c507a34349c6147e5875b234cd883db0943b92c4045`.
+These preparation/build logs and hashes are in `autoconf-retry/`; the raw
+source archive differences and earlier archives remain preserved. Source
+archives refreshed after this step explicitly include regenerated build
+configuration rather than claiming to be unchanged original payloads.
+
 ## Fresh uninterrupted confirmation
 
 A new pair, `open7-offline-repro-20261106-r3`, started at 21:20 UTC from the
@@ -76,6 +96,8 @@ manifests and final archive hashes automatically. Its `status.json` and
 `comparison.json` are authoritative. At the time of this entry it is running;
 the repaired initial pair is not counted as two uninterrupted full-script
 passes.
+This confirmation pair froze before the later fd2sfd preparation change;
+the latter has the separate clean component rebuild evidence above.
 
 ## AROS and remaining release work
 
