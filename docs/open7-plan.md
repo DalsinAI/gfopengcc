@@ -78,8 +78,12 @@ Two native offline compilations completed. The second required a validation
 reader correction for SIGPIPE. Comparing their 4,470-entry installed prefixes
 then exposed random Hunk member paths in seventeen SSP archives and a racy
 Info index. Correcting and independently rebuilding those components made
-the complete prefixes identical. A fresh pair using the fixed recipe from
-the outset is running as `open7-offline-repro-20261106-r3`; the repaired pair
+the complete prefixes identical. An additional source-archive difference was
+fd2sfd's timestamp-dependent Autoconf regeneration; explicit preparation and
+clean host-tool rebuilds now give matching binary and source archives too.
+A fresh pair with the validation/SSP/index fixes is running as
+`open7-offline-repro-20261106-r3`; it predates the final Autoconf preparation
+fix, which has separate clean component evidence. The repaired pair
 is not counted as two uninterrupted full-script passes. See
 [the offline campaign receipt](validation/open7-offline-20261106.md).
 

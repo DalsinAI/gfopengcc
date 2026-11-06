@@ -87,6 +87,24 @@ source archive differences and earlier archives remain preserved. Source
 archives refreshed after this step explicitly include regenerated build
 configuration rather than claiming to be unchanged original payloads.
 
+## Matching final artifacts
+
+The corrected campaign completed with status `matched-after-recorded-fixes`.
+All 4,470 installed entries match, including bytes, modes and symlink targets.
+Both independently packaged artifact sets in `run-1/packages-qualified/` and
+`run-2/packages-qualified/` have identical hashes:
+
+| Artifact | SHA-256 in both runs |
+| --- | --- |
+| `gfopenamigagcc-16.2.0-open7-x86_64-linux.tar.xz` | `0bf5a4d5072d9ee6f470bd3a65ace3f9f20504ccde69c64d09318f330038695d` |
+| `gfopenamigagcc-16.2.0-open7-src.tar.xz` | `f19f25f5373d5268808eeea125fb5a3b037bb5a8aa4f0d347faedf1bfb2340cc` |
+
+Packaging froze `c288ff154cf7366b3fe5d118f4bb110b4d8380f7` and retained the
+original epoch. `comparison.json` records the matching final hashes and the
+earlier source mismatch. Both package logs passed the NDK exclusion and
+GFOpenNDK/provenance checks. These are candidate artifacts, not a published
+release or a substitute for the outstanding runtime gates.
+
 ## Fresh uninterrupted confirmation
 
 A new pair, `open7-offline-repro-20261106-r3`, started at 21:20 UTC from the

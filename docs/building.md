@@ -68,7 +68,7 @@ See [aros.md](aros.md).
 
 Commit the recipe before launching either runner. Both runners freeze it in a
 separate checkout, disable compiler caches and reject network `socket` and
-`connect` calls using an inherited seccomp filter. They require Python 3,
+`connect` calls using an inherited seccomp filter. They require Python 3.11+,
 `libseccomp.so.2` and the ordinary host build tools. Socket-denial probes must
 pass before source preparation starts. Each record folder must be new.
 
