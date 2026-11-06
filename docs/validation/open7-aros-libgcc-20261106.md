@@ -49,3 +49,41 @@ This is the same compiler-only gate used by CI because no complete AROS SDK
 was supplied. It proves the clean compiler bootstrap and generated-instruction
 checks; it does not replace a full AROS SDK/libgcc/libstdc++ build or target
 runtime qualification.
+
+## Full-SDK integration build
+
+The compiler-only prefix was removed and the source/build folders were reset.
+An isolated copy of
+`AmiCradle/stoves/aros68k-gcc16-open6/sdk/Developer` supplied the complete
+AROS SDK at the pinned AROS commit. The clean build then completed binutils,
+collect-aros, GCC, all seven libgcc/libstdc++ multilibs and all seven libatomic
+multilibs. The installed compiler identifies itself as
+`m68k-aros-gcc (GFOpenAmigaGCC 16.2.0-open7) 16.2.0`.
+
+The first final C++ link exposed a host-tool defect rather than a target-code
+failure. The no-libiberty `collect-aros` fallback hardcoded
+`/tmp/catmpXXXXXX`; a syscall trace showed the linker write failing with
+`EDQUOT` even after the build volume had 16 GiB free. A new AROS series patch
+makes collect-aros honor nonempty `TMPDIR` while retaining `/tmp` as its
+fallback, and `scripts/build-aros.sh` supplies a work-folder temporary
+directory by default.
+
+After rebuilding only collect-aros with that patch:
+
+- a traced 68040 C++/pthread/atomic link succeeded;
+- every `catmp` open was below `open7-aros/.tmp`, with none below `/tmp`;
+- all seven multilibs contained the five required integer helpers;
+- the C and C++ SDK links succeeded;
+- all 24 AROS autoincrement compile/scan cases passed.
+
+Artifact hashes for this full integration prefix are:
+
+- `cc1`: `e1af4fe0519989a9114100842fee72897bdefba086b56f04301ce8682214c58e`
+- `cc1plus`: `46f00e3ba4d23e76cc7c7606ffb7caadc916a81fd4396929b6f018f9a7078b0c`
+- fixed `collect-aros`:
+  `72f7787fdb90bc69751a22d37e859d60b2945ecd9b6d0948eac73686098c4a7e`
+
+The compiler and target libraries came from an empty build/prefix reset, but
+the final collect-aros binary was corrected after that run. This is complete
+full-SDK integration evidence, not yet the uninterrupted clean receipt for the
+new eight-patch series. A clean rerun and AROS runtime execution remain open.

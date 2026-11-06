@@ -1,6 +1,7 @@
 # The m68k-aros target's patch series, applied in this order by scripts/build-aros.sh.
-# One line per patch: the source tree it goes into (gcc or binutils), then its path
-# under patches/. Lines starting with "#" are notes.
+# One line per patch: the source tree it goes into (gcc, binutils or
+# collect-aros), then its path under patches/. Lines starting with "#" are
+# notes.
 #
 # GCC: stock GCC 16.2.0 (scripts/aros.lock), then AROS's own diff, then the m68k
 # code generation fixes this repository carries for m68k-amigaos: the same files
@@ -9,6 +10,7 @@
 # Every patches/gcc/*.patch is named here, either as a line or in a "# not:" note
 # saying why it is m68k-amigaos only; tests/aros-series.sh checks that.
 binutils  aros/binutils/0001-binutils-2.47-aros.diff
+collect-aros aros/collect-aros/0001-honor-tmpdir.patch
 gcc       aros/gcc/0001-gcc-16.2.0-aros.diff
 gcc       gcc/0003-m68k-early-clobber-the-m68040-fix_trunc-scratch-regi.patch
 gcc       gcc/0005-fmalloc-memset-to-calloc-and-never-turn-calloc-s-own.patch

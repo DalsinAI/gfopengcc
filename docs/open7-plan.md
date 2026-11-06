@@ -115,3 +115,13 @@ trap cases, 24 autoincrement builds, lean C++, baserel EH, 110 libnix self-call
 checks, all per-multilib libamiga checks, fpuauto installation and provenance.
 This remains integration evidence rather than a clean-build receipt; the two
 clean offline builds and runtime qualification are still open.
+
+A clean AROS compiler/target-library build against an isolated complete SDK
+also completed all seven libgcc, libstdc++ and libatomic variants. Its final
+C++ gate exposed a host-only quota defect: collect-aros ignored `TMPDIR` and
+always wrote a large intermediate link below `/tmp`. The AROS patch series now
+makes collect-aros honor `TMPDIR`, and the AROS build supplies a work-folder
+default. Rebuilding that host tool made the 68040 C++/pthread/atomic link pass;
+all seven helper audits and 24 autoincrement cases pass. Because the host tool
+was corrected after the clean target-library run, one uninterrupted clean
+rerun of the eight-patch AROS series and AROS runtime execution are still open.

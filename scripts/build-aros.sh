@@ -20,6 +20,10 @@ set -euo pipefail
 WORK=$(cd "$1" && pwd); PREFIX=$2; SYSROOT=$3; JOBS=${4:-$(nproc)}
 HERE=$(cd "$(dirname "$0")/.." && pwd)
 mkdir -p "$PREFIX"; PREFIX=$(cd "$PREFIX" && pwd)
+if [ -z "${TMPDIR:-}" ]; then
+  TMPDIR=$WORK/.gfopenamigagcc-tmp
+fi
+mkdir -p "$TMPDIR"; TMPDIR=$(cd "$TMPDIR" && pwd); export TMPDIR
 A=$WORK/aros; S=$A/src; B=$A/build; LOGS=$A/logs; mkdir -p "$LOGS"
 # The identity scripts/build.sh gives the m68k-amigaos GCC (tests/release-names.sh keeps them in step).
 ID="GFOpenAmigaGCC 16.2.0-open7"
@@ -52,7 +56,12 @@ tar -C "$S" -xf "$A/binutils-2.47.tar.bz2"
 tar -C "$S" -xf "$A/isl-0.27.tar.xz" && mv "$S/isl-0.27" "$S/gcc-16.2.0/isl"   # built in tree
 grep -v '^#' "$HERE/patches/aros/series" | while read -r tree p; do
   [ -n "$tree" ] || continue
-  case $tree in gcc) d=$S/gcc-16.2.0 ;; binutils) d=$S/binutils-2.47 ;; *) echo "series: no tree $tree"; exit 1 ;; esac
+  case $tree in
+    gcc) d=$S/gcc-16.2.0 ;;
+    binutils) d=$S/binutils-2.47 ;;
+    collect-aros) d=$AROS/tools/collect-aros ;;
+    *) echo "series: no tree $tree"; exit 1 ;;
+  esac
   ( cd "$d" && patch -p1 -s -F0 -f --dry-run < "$HERE/patches/$p" > /dev/null ) || { echo "does not apply: patches/$p"; exit 1; }
   ( cd "$d" && patch -p1 -s -F0 -f --no-backup-if-mismatch < "$HERE/patches/$p" )
   echo "applied $p"
