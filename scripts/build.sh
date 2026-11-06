@@ -11,6 +11,9 @@
 set -euo pipefail
 WORK=$(cd "$1" && pwd); PREFIX=$2; NDK=$3; JOBS=${4:-$(nproc)}
 HERE=$(cd "$(dirname "$0")/.." && pwd)
+command -v flock >/dev/null || { echo "flock is required to protect the build work folder"; exit 1; }
+exec 9>"$WORK/.gfopenamigagcc-build.lock"
+flock -n 9 || { echo "another GFOpenAmigaGCC build is using $WORK"; exit 1; }
 mkdir -p "$PREFIX"; PREFIX=$(cd "$PREFIX" && pwd)
 LOGS=$WORK/gfopenamigagcc-logs; mkdir -p "$LOGS"
 NOFETCH=""
@@ -68,6 +71,7 @@ apply "$WORK/projects/gcc" "$HERE"/patches/gcc/*.patch
 apply "$WORK" "$HERE"/patches/amiga-gcc/*.patch
 apply "$WORK/projects/libnix" "$HERE"/patches/libnix/*.patch ${LIBNIX_PATCHES:+"$LIBNIX_PATCHES"/*.patch}
 apply "$WORK/projects/aros-stuff" "$HERE"/patches/aros-stuff/*.patch
+apply "$WORK/projects/gfopensdk" "$HERE"/patches/gfopensdk/*.patch
 cp "$HERE"/sys-include/*.h "$WORK/sys-include/"
 # Roadshow's bsdsocket.h and usergroup.h inlines (amiga-netinclude, installed
 # beside the NDK's) clobber registers their arguments sit in; GCC 16 refuses
@@ -128,12 +132,15 @@ T=$PREFIX/m68k-amigaos
   fl=${flags//@/ -}
   case " $fl " in *" -mcpu="*|*" -m680"[0-6]"0 "*) ;; *) fl="-m68000$fl" ;; esac
   log=$LOGS/openndk-libamiga-$([ "$dir" = . ] && echo plain || echo "${dir//\//-}").log
-  ( PREFIX="$PREFIX/bin/m68k-amigaos-" EXTRA_CFLAGS="$fl" sh "$OPENNDK/lib/build.sh" ) > "$log" 2>&1 \
+  ( PREFIX="$PREFIX/bin/m68k-amigaos-" EXTRA_CFLAGS="$fl" JOBS="$JOBS" sh "$OPENNDK/lib/build.sh" ) > "$log" 2>&1 \
     || { echo "GFOpenNDK's libamiga.a for multilib '$dir' ($fl) failed (see $log)"; exit 1; }
   mkdir -p "$T/lib/$dir"
   rm -f "$T/lib/$dir/libamiga.a"
   cp "$OPENNDK/lib/build/m68k-amigaos/libamiga.a" "$T/lib/$dir/libamiga.a"
 done
+if grep -aF '68040/68060/68080 and 68851 specified' "$LOGS"/openndk-libamiga-*.log >/dev/null; then
+  echo "GFOpenNDK used contradictory CPU options (see $LOGS/openndk-libamiga-*.log)"; exit 1
+fi
 
 # 6. libgcc, libstdc++ and the other target libraries, against libnix's
 #    headers, so libstdc++'s configure sees C99 maths, dirent and chdir.

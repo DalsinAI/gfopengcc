@@ -52,6 +52,9 @@ jobs:
       - name: Release names agree
         run: tests/release-names.sh ${{ inputs.release }}
 
+      - name: Exclusive build work folder
+        run: tests/build-lock.sh
+
       - name: Fetch sources
         run: scripts/fetch.sh "$WORK"
 

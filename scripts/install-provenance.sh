@@ -16,7 +16,7 @@ DEST=$PREFIX/share/gfopenamigagcc/provenance
 [ -f "$STAMP" ] || { echo "provenance: missing $STAMP"; exit 1; }
 
 patches=()
-for dir in gcc amiga-gcc libnix aros-stuff; do
+for dir in gcc amiga-gcc libnix aros-stuff gfopensdk; do
   while IFS= read -r patch; do patches+=("$patch"); done \
     < <(find "$HERE/patches/$dir" -maxdepth 1 -type f -name '*.patch' | sort)
 done

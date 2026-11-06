@@ -1,0 +1,76 @@
+From: AmiCradle Team <team@amicradle.invalid>
+Subject: [PATCH] OpenNDK: build each multilib with one CPU, in parallel
+
+GFOpenAmigaGCC already supplies the exact CPU option for every multilib.
+Keeping -m68040 before it sent contradictory CPU modes to cc1 and GAS; the
+68020 builds emitted thousands of mixed CPU/MMU warnings and concurrent
+archive builds could lose their object directory.  Use only the selected
+multilib CPU and permit bounded parallel object compilation.
+
+---
+ OpenNDK/lib/build.sh | 30 ++++++++++++++++++++++++++++--
+ 1 file changed, 28 insertions(+), 2 deletions(-)
+
+diff --git a/OpenNDK/lib/build.sh b/OpenNDK/lib/build.sh
+index f0cf844..e51dbe7 100755
+--- a/OpenNDK/lib/build.sh
++++ b/OpenNDK/lib/build.sh
+@@ -4,6 +4,7 @@
+ # and code that don't use the inline headers, and the varargs forms such
+ # as OpenWindowTags), plus the helpers in alib/.
+ #   lib/build.sh                 with the os32-gcc16 stove (m68k-amigaos-)
++#   JOBS=8 lib/build.sh          compile up to eight objects at once
+ #   PREFIX=m68k-linux-gnu- lib/build.sh   with an ELF m68k GCC (cloud tests)
+ # Output: lib/build/<prefix>/libamiga.a
+ set -eu
+@@ -19,6 +20,11 @@ fi
+ CC=${CC:-${PREFIX}gcc}
+ AR=${AR:-${PREFIX}ar}
+ OUT="$NDK/lib/build/$(basename -- "$PREFIX" | sed 's/-$//')"
++JOBS=${JOBS:-1}
++case $JOBS in
++    ''|*[!0-9]*|0) echo "JOBS must be a positive integer" >&2; exit 2 ;;
++esac
++
+ rm -rf "$OUT"
+ mkdir -p "$OUT/stubs" "$OUT/obj"
+ python3 "$NDK/tools/ndkgen.py" --out "$OUT/gen" --stubs "$OUT/stubs" "$NDK"/SFD/*.sfd >/dev/null
+@@ -26,14 +32,34 @@ python3 "$NDK/tools/ndkgen.py" --out "$OUT/gen" --stubs "$OUT/stubs" "$NDK"/
+ # one; the compiler's own include folder still gives stdarg.h
+ CFLAGS="-nostdinc -isystem $($CC -print-file-name=include) -idirafter $NDK/check/shim -I$NDK/Include_H
+-  -O2 -m68040 -fomit-frame-pointer -fno-builtin -Wall -Wextra -Werror
++  -O2 -fomit-frame-pointer -fno-builtin -Wall -Wextra -Werror
+   -Wno-unused-parameter ${EXTRA_CFLAGS:-}"
+ n=0
++running=0
++pids=
++wait_batch() {
++    failed=0
++    for pid in $pids; do
++        if ! wait "$pid"; then
++            failed=1
++        fi
++    done
++    [ "$failed" -eq 0 ] || exit 1
++    pids=
++    running=0
++}
++
+ for src in "$OUT"/stubs/*.c "$NDK"/lib/alib/*.c "$NDK"/lib/alib/*.S; do
+     obj="$OUT/obj/$(basename "$src" | sed 's/\.[cS]$/.o/')"
+     # shellcheck disable=SC2086
+-    "$CC" $CFLAGS -c "$src" -o "$obj"
++    "$CC" $CFLAGS -c "$src" -o "$obj" &
++    pids="$pids $!"
++    running=$((running + 1))
+     n=$((n + 1))
++    if [ "$running" -ge "$JOBS" ]; then
++        wait_batch
++    fi
+ done
++[ "$running" -eq 0 ] || wait_batch
+ rm -f "$OUT/libamiga.a"
+ "$AR" rcs "$OUT/libamiga.a" "$OUT"/obj/*.o
+ echo "$OUT/libamiga.a: $n objects"
+-- 
+2.47.3

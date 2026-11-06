@@ -60,8 +60,16 @@ list.
 
 ## Current development state
 
-Items 1–3 have candidate implementations and host-side validation receipts.
-Item 4 now has a candidate per-multilib stack-protector runtime and an explicit
-driver diagnostic for the unsupported aggregate `-fhardened` option. The
-rebuilt-driver and 11-multilib host link matrix pass; clean full-build and
-AmigaOS runtime evidence remain release qualification work.
+Items 1–6 have candidate implementations and host-side validation receipts.
+That includes the deterministic cost model, AROS helper coverage,
+multicore-safe `fpuauto`, all four stack-protector modes, an explicit
+`-fhardened` diagnostic, trap-mode UBSan, the 32-profile optimiser matrix and
+192 defined-behaviour differential executions.
+
+The first item 7 clean integration attempt exposed two build-system gaps: the
+work folder admitted concurrent builds, and OpenNDK's per-multilib library
+builder passed a hardcoded `-m68040` before the selected CPU while compiling
+1,303 objects serially. Open7 now has an exclusive work-folder lock and a
+provenanced GFOpenNDK patch that selects one CPU and uses bounded parallel
+compilation. The corrected full build, the second reproducibility build and
+AmigaOS/AROS/AC090 runtime evidence remain release qualification work.
