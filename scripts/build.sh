@@ -157,14 +157,17 @@ for f in $(find "$PREFIX/lib/gcc/m68k-amigaos" -path "*include/c++*" -name c++co
   done
 done
 
-# 6b. libnix4.a (the static part of the shared libnix, for -mcrt=library). The
-#     shared libnix4.library itself does not link (a duplicate
-#     __vfwprintf_total_size export); static programs don't need it.
+# 6b. Shared libnix and its static support archive, for -mcrt=library.
 echo done > "$WORK/build-Linux-m68k-amigaos/gcc/_libgcc_done"   # step 6 built and installed them
-( cd "$WORK" && $NOFETCH make libnix4.library PREFIX="$PREFIX" THREADS=posix NDK=3.2 ) > "$LOGS/libnix4.log" 2>&1 || true
-if [ -f "$WORK/build-Linux-m68k-amigaos/libnix/libb/libnix4.a" ]; then
-  cp "$WORK/build-Linux-m68k-amigaos/libnix/libb/libnix4.a" "$PREFIX/m68k-amigaos/libnix/lib/libb/"
-fi
+( cd "$WORK" && $NOFETCH make libnix4.library PREFIX="$PREFIX" THREADS=posix NDK=3.2 ) > "$LOGS/libnix4.log" 2>&1 || {
+  echo "libnix4 failed (see $LOGS/libnix4.log)"; exit 1;
+}
+for f in \
+  "$WORK/build-Linux-m68k-amigaos/libnix/libb/libnix4.a" \
+  "$WORK/build-Linux-m68k-amigaos/libnix/libb/libnix4.library"; do
+  [ -s "$f" ] || { echo "libnix4 did not produce $f"; exit 1; }
+done
+cp "$WORK/build-Linux-m68k-amigaos/libnix/libb/libnix4.a" "$PREFIX/m68k-amigaos/libnix/lib/libb/"
 
 # 6c. Stack-protector support is absent from libnix. Install the small Open7
 #     runtime into every advertised multilib before exercising the driver.

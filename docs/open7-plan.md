@@ -74,6 +74,17 @@ provenanced GFOpenNDK patch that selects one CPU and uses bounded parallel
 compilation. The corrected integration completed from the fresh source work
 folder and passed the host/QEMU regression matrices.
 
+The same integration exposed a long-standing `libnix4.library` failure that
+earlier builds ignored. A misspelled object exclusion admitted two
+`__vfwprintf_total_size` implementations. Patch `0009` corrects the list, the
+shared library now links and installs, and a missing or failed libnix4 target
+is fatal to the build.
+
+A fresh Open7 AROS compiler bootstrap has also completed from the pinned GCC,
+binutils, isl and AROS commits. All seven selected AROS patches applied and 24
+autoincrement combinations passed. Because that build intentionally had no
+AROS SDK, the full target libraries and runtime qualification remain open.
+
 Compiling the AmigaOS runtime payloads then exposed a further AC090 gap:
 `-m68040 -m68881` currently selects the `68020 + 68881` libstdc++ multilib.
 Equivalent inline COMDAT code can therefore differ byte-for-byte (`addaw`

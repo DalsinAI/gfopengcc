@@ -55,6 +55,9 @@ jobs:
       - name: Exclusive build work folder
         run: tests/build-lock.sh
 
+      - name: Shared libnix source list
+        run: tests/libnix4-source-list.sh
+
       - name: Fetch sources
         run: scripts/fetch.sh "$WORK"
 

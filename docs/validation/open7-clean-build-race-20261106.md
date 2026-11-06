@@ -108,3 +108,18 @@ the `libm020/libm881` library built for 68020.
 No runtime wrong-code was demonstrated. The warning and missed 68040 library
 optimisation remain an explicit AC090 qualification gap rather than being
 waived silently.
+
+## Shared libnix defect exposed after integration
+
+The integration log also showed that `libnix4.library` still failed while the
+build deliberately ignored its status. `preplib` excluded the nonexistent
+`__vwfprintf_total_size.o` rather than `__vfwprintf_total_size.o`. The normal
+helper and the math library's deliberate `FULL_SPECIFIERS` copy consequently
+produced duplicate C exports and a duplicate linker definition.
+
+Open7 patch `0009` corrects that source list. The real shared-library rebuild
+then completed, installed a 210,484-byte `libnix4.library`, and `nm` found one
+code definition of `__vfwprintf_total_size`. `scripts/build.sh` now stops if
+the target fails or either the shared library or static support archive is
+missing; `tests/libnix4-source-list.sh` preserves the source-list invariant.
+This repairs a limitation recorded in the Open2 through Open6 release notes.
