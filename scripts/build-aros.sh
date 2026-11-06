@@ -135,12 +135,14 @@ printf 'int f(int *p, int n) { int s = 0; while (n--) s += *p++; return s; }\n' 
 "$PREFIX/$T-gcc" -m68040 -O2 -c -o "$C/sum.o" "$C/sum.c"
 "$PREFIX/$T-objdump" -f "$C/sum.o" | grep -q 'elf32-m68k' || { echo "$T-gcc did not make an m68k ELF object"; exit 1; }
 if [ "$FULL" = 1 ]; then
+  "$HERE/tests/aros-libgcc.sh" "$PREFIX"
   printf '#include <stdio.h>\nint main(void) { printf("hello\\n"); return 0; }\n' > "$C/hello.c"
   "$PREFIX/$T-gcc" -m68040 -O2 -o "$C/hello" "$C/hello.c"
-  # C++ as the aros68k-gcc16 stove's tests link it (libstdc++ locks through pthread, whose init
-  # entry only an early reference keeps), at the default CPU: a -m68040 C++
-  # link is left with __divsi3 undefined (the aros68k-gcc16 stove's too)
-  "$PREFIX/$T-g++" -O2 -std=c++23 -o "$C/hellocxx" -x c++ - -x none -Wl,-u,__pthread_Init_Func -lpthread -latomic <<'CXX'
+  # C++ as the aros68k-gcc16 stove's tests link it (libstdc++ locks through
+  # pthread, whose init entry only an early reference keeps).  Keep -m68040:
+  # Open6's notes recorded an unresolved __divsi3 here, although the installed
+  # Open6 and archived predecessor now both pass this exact link.
+  "$PREFIX/$T-g++" -m68040 -O2 -std=c++23 -o "$C/hellocxx" -x c++ - -x none -Wl,-u,__pthread_Init_Func -lpthread -latomic <<'CXX'
 #include <vector>
 #include <algorithm>
 #include <cstdio>

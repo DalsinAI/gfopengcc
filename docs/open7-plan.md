@@ -17,7 +17,8 @@ the comparison baseline.
 ### Correctness
 
 - The Open6 reproducer suite remains green.
-- AROS C++ links at `-m68040` without an unresolved `__divsi3`.
+- AROS C++ links at `-m68040` without an unresolved `__divsi3`, and every
+  advertised multilib contains the selected integer runtime helpers.
 - ABI tests cover structures, packed data, varargs, 64-bit arithmetic,
   nested functions, base-relative code, resident code and both float ABIs.
 - Generated programs agree at `-O0`, `-O2`, `-O3` and `-Os` for every
