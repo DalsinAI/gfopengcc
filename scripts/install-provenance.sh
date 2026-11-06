@@ -50,8 +50,8 @@ cp "$STAMP" "$DEST/applied-patches.txt"
 ) > "$DEST/source-heads.txt"
 
 {
-  "$PREFIX/bin/m68k-amigaos-gcc" --version | head -1
-  "$PREFIX/bin/m68k-amigaos-ld" --version | head -1
+  "$PREFIX/bin/m68k-amigaos-gcc" --version | sed -n '1p'
+  "$PREFIX/bin/m68k-amigaos-ld" --version | sed -n '1p'
 } > "$DEST/toolchain.txt"
 
 echo "provenance: ${#patches[@]} applied build patches and all source heads preserved in $DEST"

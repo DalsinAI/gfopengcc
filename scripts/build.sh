@@ -222,13 +222,13 @@ CC="$PREFIX/bin/m68k-amigaos-gcc"
 C=$LOGS/check; mkdir -p "$C"
 # The identity patches/amiga-gcc/0002 gives it (tests/release-names.sh keeps them in step).
 ID="GFOpenAmigaGCC 16.2.0-open7"
-"$CC" --version | head -1 | grep -Fq "($ID)" || {
+"$CC" --version | sed -n '1p' | grep -F "($ID)" > /dev/null || {
   echo "gcc does not identify itself as $ID"; exit 1;
 }
 "$HERE/tests/cost-model/check.sh" "$PREFIX/bin"
 "$HERE/tests/hardening/check.sh" "$PREFIX/bin"
 "$HERE/tests/amigaos-multilib.sh" "$PREFIX"
-link_cpu=$("$CC" -dumpspecs | sed -n '/^\*link_cpu:/{n;p;q;}')
+link_cpu=$(bash "$HERE/scripts/read-link-cpu.sh" "$CC")
 case "$link_cpu" in
   *'mhard-float|m68881|mcpu=6804'* )
     echo "-m68040 still selects the hard-float libm881"; exit 1 ;;

@@ -103,7 +103,7 @@ mkdir -p "$B/gcc"
     --with-pkgversion="$ID" ) > "$LOGS/gcc-configure.log" 2>&1 || { echo "gcc configure failed (see $LOGS/gcc-configure.log)"; exit 1; }
 ( cd "$B/gcc" && make -j"$JOBS" all-gcc && make -j1 install-gcc ) > "$LOGS/gcc.log" 2>&1 \
   || { echo "gcc failed (see $LOGS/gcc.log)"; exit 1; }
-"$PREFIX/$T-gcc" --version | head -1 | grep -Fq "($ID)" || { echo "m68k-aros-gcc does not identify itself as $ID"; exit 1; }
+"$PREFIX/$T-gcc" --version | sed -n '1p' | grep -F "($ID)" > /dev/null || { echo "m68k-aros-gcc does not identify itself as $ID"; exit 1; }
 
 if [ "$FULL" = 1 ]; then
   say "libgcc and libstdc++ against $SR"
@@ -159,4 +159,4 @@ int main() { std::vector<int> v{3, 1, 2}; std::sort(v.begin(), v.end()); std::pr
 CXX
   echo "linked a C and a C++ program against $SR"
 fi
-echo "$("$PREFIX/$T-gcc" --version | head -1) built in $PREFIX"
+echo "$("$PREFIX/$T-gcc" --version | sed -n '1p') built in $PREFIX"
