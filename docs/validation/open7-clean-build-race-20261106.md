@@ -64,5 +64,47 @@ propagation.
 - Legacy serial archives observed in the integration log: approximately
   63–129 seconds, with FPU variants slowed further by warning output.
 
-The corrected full integration build and final per-multilib instruction scan
-remain required before this gate is closed.
+## Corrected integration result
+
+Commit `3e1d37a` was applied to the fresh work folder after the overlapping
+legacy invocation had cleared. The successful GCC/binutils bootstrap was
+retained; the patched GFOpenNDK stage and every later build stage were rerun.
+The completed integration reported:
+
+- eleven warning-free GFOpenNDK archives, all selected from their own
+  multilib folders;
+- eleven stack-protector runtimes with all three required symbols;
+- deterministic cost-model and hardening checks passed;
+- 50 libnix memory/calloc objects checked with no recursive block call;
+- multicore-safe `fpuauto` installed with 186 wrapped references and no code
+  patch/cache flush;
+- 37 applied build patches and every resolved source head installed in the
+  provenance bundle.
+
+The post-build host/QEMU checks also passed:
+
+- both Open6 reproducer runs, with and without loop-distribution patterns;
+- 32 optimiser CPU/profile combinations with checksum `2472283987`;
+- 192 defined-behaviour differential optimiser executions;
+- 120 trap-mode UBSan executions across five CPU/ABI profiles;
+- 24 autoincrement compiles, fourteen strtol/strtoul controls, lean C++ and
+  all base-relative exception/archive checks.
+
+This proves that the corrected integration can complete from the fresh source
+set. Because the build was resumed after the race fix rather than restarted
+from an empty build directory, it does not satisfy the first of the two
+uninterrupted reproducibility builds required for release.
+
+## Newly exposed 68040 multilib gap
+
+Six AmigaOS-only runtime payloads compiled successfully for
+`-m68040 -m68881`, but four C++ links warned that
+`.text._ZNSt14_Function_baseD2Ev` had different contents in the application
+and libstdc++'s `mutex.o`. The application used `addaw #12,sp`; the library
+used `lea sp@(12),sp`. Both are equivalent and the isolated 68020 link was
+warning-free, but the result confirms that 68040 applications currently reuse
+the `libm020/libm881` library built for 68020.
+
+No runtime wrong-code was demonstrated. The warning and missed 68040 library
+optimisation remain an explicit AC090 qualification gap rather than being
+waived silently.

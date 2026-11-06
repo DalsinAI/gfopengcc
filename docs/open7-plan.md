@@ -71,5 +71,14 @@ work folder admitted concurrent builds, and OpenNDK's per-multilib library
 builder passed a hardcoded `-m68040` before the selected CPU while compiling
 1,303 objects serially. Open7 now has an exclusive work-folder lock and a
 provenanced GFOpenNDK patch that selects one CPU and uses bounded parallel
-compilation. The corrected full build, the second reproducibility build and
-AmigaOS/AROS/AC090 runtime evidence remain release qualification work.
+compilation. The corrected integration completed from the fresh source work
+folder and passed the host/QEMU regression matrices.
+
+Compiling the AmigaOS runtime payloads then exposed a further AC090 gap:
+`-m68040 -m68881` currently selects the `68020 + 68881` libstdc++ multilib.
+Equivalent inline COMDAT code can therefore differ byte-for-byte (`addaw`
+versus `lea` for the same stack adjustment), which makes the hunk linker emit
+duplicate-section warnings. Open7 needs a dedicated 68040 multilib, or another
+demonstrably safe warning-free design, before the AC090 profile is qualified.
+An uninterrupted clean build, the second reproducibility build and
+AmigaOS/AROS/AC090 runtime evidence also remain release qualification work.
