@@ -1,0 +1,39 @@
+Subject: [PATCH] amigaos: link SSP runtime and reject unsupported -fhardened
+
+AmigaOS libnix does not provide the global canary and failure routine that
+GCC's stack protector references.  Select libssp for every stack-protector
+mode; the Open7 build installs it in each multilib.
+
+GCC diagnoses -fhardened as unsupported on this target but still enables PIE,
+then emits GOT syntax the Amiga assembler rejects.  Stop in the driver with a
+single actionable diagnostic instead.
+---
+ gcc/config/m68k/m68kamigaos.h | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/gcc/config/m68k/m68kamigaos.h b/gcc/config/m68k/m68kamigaos.h
+index 2db19ce..12f4c01 100644
+--- a/gcc/config/m68k/m68kamigaos.h
++++ b/gcc/config/m68k/m68kamigaos.h
+@@ -492,5 +492,7 @@
+   "%{!mcrt=*:%{!noixemul:%(lib_newlib)}} " \
+   "%{fprofile-arcs|fprofile-generate*|coverage:-lgcov} " \
++  "%{fstack-protector|fstack-protector-all|fstack-protector-strong|" \
++    "fstack-protector-explicit:-lssp} " \
+   "-lamiga -lgcc "\
+   __LPTHREAD__ \
+   "%{lm:-lm } "\
+@@ -770,7 +772,10 @@
+    this stove does not build. This keeps libstdc++'s configure link tests
+    (and plain m68k-amigaos-g++ use) on the real C library.  */
+ #undef DRIVER_SELF_SPECS
+-#define DRIVER_SELF_SPECS "%{!mcrt=*:%{!noixemul:%{!nostdlib:-mcrt=nix20}}}", \
++#define DRIVER_SELF_SPECS \
++  "%{fhardened:%e-fhardened is not supported for m68k-amigaos - " \
++    "use -fstack-protector-strong instead}", \
++  "%{!mcrt=*:%{!noixemul:%{!nostdlib:-mcrt=nix20}}}", \
+   OPENAMIGAGCC_SAFE_DEFAULTS
+ 
+ /* GFOpenAmigaGCC: safe defaults, built into the driver so no build has to
+-- 
+2.51.0

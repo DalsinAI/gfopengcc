@@ -57,3 +57,11 @@ the comparison baseline.
 An unfinished item is either fixed, explicitly unsupported, or recorded as a
 deferred issue with a reproducer. Open7 will not inherit a silent known-issue
 list.
+
+## Current development state
+
+Items 1–3 have candidate implementations and host-side validation receipts.
+Item 4 now has a candidate per-multilib stack-protector runtime and an explicit
+driver diagnostic for the unsupported aggregate `-fhardened` option. The
+rebuilt-driver and 11-multilib host link matrix pass; clean full-build and
+AmigaOS runtime evidence remain release qualification work.

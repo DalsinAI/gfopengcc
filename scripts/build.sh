@@ -159,6 +159,11 @@ if [ -f "$WORK/build-Linux-m68k-amigaos/libnix/libb/libnix4.a" ]; then
   cp "$WORK/build-Linux-m68k-amigaos/libnix/libb/libnix4.a" "$PREFIX/m68k-amigaos/libnix/lib/libb/"
 fi
 
+# 6c. Stack-protector support is absent from libnix. Install the small Open7
+#     runtime into every advertised multilib before exercising the driver.
+say "stack-protector runtime"
+"$HERE/scripts/install-ssp.sh" "$PREFIX"
+
 # 7. Checks.
 say checks
 CC="$PREFIX/bin/m68k-amigaos-gcc"
@@ -169,6 +174,7 @@ ID="GFOpenAmigaGCC 16.2.0-open6"
   echo "gcc does not identify itself as $ID"; exit 1;
 }
 "$HERE/tests/cost-model/check.sh" "$PREFIX/bin"
+"$HERE/tests/hardening/check.sh" "$PREFIX/bin"
 link_cpu=$("$CC" -dumpspecs | sed -n '/^\*link_cpu:/{n;p;q;}')
 case "$link_cpu" in
   *'mhard-float|m68881|mcpu=6804'* )
