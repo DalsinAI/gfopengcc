@@ -28,3 +28,4 @@ gcc       gcc/0014-vregs-virtual-registers-inside-an-address-operand-ar.patch
 # not: 0010-amigaos-fuse-cxa-atexit-by-default-thread_local-dest.patch   AmigaOS/libnix (config.gcc's amigaos entry); AROS's own config decides
 # not: 0011-amigaos-EH-data-is-always-absolute-DW_EH_PE_absptr.patch     AmigaOS hunk relocations (m68kamigaos.h)
 # not: 0012-amigaos-m68040-soft-float-does-not-link-libm881.patch       AmigaOS multilib selection (m68kamigaos.h)
+# not: 0015-m68k-cost-overrides-are-explicit-and-bounded.patch          bebbo's runtime-tunable m68k_costs.cc; stock GCC used by AROS has no ambient cost-file loader

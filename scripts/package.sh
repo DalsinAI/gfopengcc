@@ -28,6 +28,11 @@ rsync -a --no-group --exclude '.git' --exclude '__pycache__' "$HERE/" "$S/$SRC/g
 # Nothing of the NDK, and every libamiga.a GFOpenNDK's.
 bad=$(cd "$S" && find . \( -path '*/projects/NDK3.2*' -o -name 'NDK3.2.lha' -o -iname 'amiga.lib' -o -name 'ndk-include' -o -name 'ndk13-include' \) -print | head -5)
 [ -z "$bad" ] || { echo "NDK files in the release: $bad"; exit 1; }
+[ -f "$S/$BIN/share/gfopenamigagcc/provenance/all-patches.sha256" ] || {
+  echo "installed provenance bundle is missing from the binary release"; exit 1;
+}
+( cd "$S/$BIN/share/gfopenamigagcc/provenance" && sha256sum -c all-patches.sha256 ) \
+  || { echo "installed provenance patch hashes do not verify"; exit 1; }
 n=0
 while IFS= read -r a; do
   "$PREFIX/bin/m68k-amigaos-ar" t "$a" | grep -x rexxvar.o > /dev/null || { echo "${a#"$S"/} is not GFOpenNDK's libamiga.a"; exit 1; }

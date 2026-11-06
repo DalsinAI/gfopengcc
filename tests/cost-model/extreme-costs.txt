@@ -1,0 +1,18 @@
+# Deliberately extreme but valid values.  This is a test fixture, not a
+# recommended tuning profile.
+cost_reg = 500
+cost_mem_plus_reg_disp = 500
+cost_mem_plus_reg_reg = 0
+cost_mem_other = 0
+cost_const_int_q = 500
+cost_const_int_w = 500
+cost_const_int_l = 0
+cost_plus_reg_reg = 500
+cost_plus_reg_constq = 500
+cost_plus_reg_constw = 500
+cost_plus_reg_constl = 0
+cost_logic_reg_const = 500
+cost_shift_const = 500
+cost_branch = 500
+cost_mulu_l = 1
+cost_mulu_w = 1

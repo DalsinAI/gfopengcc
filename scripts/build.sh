@@ -168,6 +168,7 @@ ID="GFOpenAmigaGCC 16.2.0-open6"
 "$CC" --version | head -1 | grep -Fq "($ID)" || {
   echo "gcc does not identify itself as $ID"; exit 1;
 }
+"$HERE/tests/cost-model/check.sh" "$PREFIX/bin"
 link_cpu=$("$CC" -dumpspecs | sed -n '/^\*link_cpu:/{n;p;q;}')
 case "$link_cpu" in
   *'mhard-float|m68881|mcpu=6804'* )
@@ -240,4 +241,5 @@ printf '#include <proto/exec.h>\n#include <clib/alib_protos.h>\nint main(void) {
 grep -q 'gfopensdk/OpenNDK\|libamiga.a(newlist.o)' "$C/alib.map" || { echo "a NewList program did not link GFOpenNDK's libamiga.a"; exit 1; }
 echo "libamiga.a: $n copies, all GFOpenNDK's; every multilib links its own"
 echo "defaults: $("$CC" -### -c -x c /dev/null 2>&1 | grep -o -- '-fno-[a-z-]*' | sort -u | tr '\n' ' ')"
+"$HERE/scripts/install-provenance.sh" "$WORK" "$PREFIX"
 echo "GFOpenAmigaGCC built in $PREFIX"
