@@ -23,7 +23,7 @@ rsync -a --no-group --exclude '/m68k-amigaos/ndk/' --exclude '/m68k-amigaos/ndk-
 # The source: amiga-gcc and its modules as built (patches applied), and this repository.
 mkdir -p "$S/$SRC/amiga-gcc" "$S/$SRC/gfopengcc"
 rsync -a --no-group --exclude '.git' --exclude '/build-*/' --exclude '/download/' --exclude '/log/' \
-  --exclude '/gfopenamigagcc-logs/' --exclude '/openamigagcc-logs/' --exclude '/.gfopenamigagcc-tmp/' --exclude '__pycache__' --exclude '*.pyc' --exclude '/projects/NDK3.2*' --exclude '/projects/gfopensdk/OpenNDK/lib/build/' \
+  --exclude '/gfopenamigagcc-logs/' --exclude '/openamigagcc-logs/' --exclude '/.gfopenamigagcc-tmp/' --exclude '__pycache__' --exclude '*.pyc' --exclude 'autom4te.cache' --exclude '/projects/fd2sfd/configure~' --exclude '/projects/NDK3.2*' --exclude '/projects/gfopensdk/OpenNDK/lib/build/' \
   "$WORK/" "$S/$SRC/amiga-gcc/"
 rsync -a --no-group --exclude '.git' --exclude '__pycache__' "$HERE/" "$S/$SRC/gfopengcc/"
 

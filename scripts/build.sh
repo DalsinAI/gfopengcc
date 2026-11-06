@@ -107,6 +107,10 @@ rsync -a --no-group "$WORK/projects/libnix/sources/headers/" "$PREFIX/m68k-amiga
 
 # 5. The toolchain: binutils, GCC, libnix, libpthread, the NDK's headers and
 #    libraries.
+# Regenerate this old helper's configure script explicitly: its Makefile
+# otherwise chooses between Autoconf 2.52 and the host version based on the
+# checkout order of configure and configure.in.
+bash "$HERE/scripts/prepare-fd2sfd.sh" "$WORK/projects/fd2sfd"
 #    The driver leaves loop distribution on (patch 0009), so the C library is
 #    built without it: libnix defines memcpy, memmove, memset, calloc, bcopy
 #    and bzero itself, and a loop in one of them must never become a call to
