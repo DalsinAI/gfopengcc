@@ -306,5 +306,6 @@ FPUAUTO=$WORK/projects/amicradle-guest/common/fpuauto
   echo "missing fpuauto installer at $FPUAUTO/install-prefix.sh"; exit 1;
 }
 "$FPUAUTO/install-prefix.sh" "$PREFIX" "$WORK/build-fpuauto"
+bash "$HERE/scripts/rebuild-info-index.sh" "$PREFIX/share/info"
 "$HERE/scripts/install-provenance.sh" "$WORK" "$PREFIX"
 echo "GFOpenAmigaGCC built in $PREFIX"

@@ -23,9 +23,14 @@ while IFS=';' read -r dir options; do
   mkdir -p "$objdir"
   # Intentional word splitting: -print-multi-lib encodes compiler switches.
   # shellcheck disable=SC2086
-  "$CC" $flags -O2 -fno-stack-protector -fno-tree-loop-distribute-patterns \
-    -c "$HERE/runtime/ssp.c" -o "$objdir/ssp.o"
-  "$AR" rcs "$objdir/libssp.a" "$objdir/ssp.o"
+  # Hunk archives preserve the object argument as their member name. Keep
+  # that name relative so neither OUT nor mktemp's random suffix is embedded.
+  ( cd "$objdir"
+    "$CC" $flags -O2 -fno-stack-protector -fno-tree-loop-distribute-patterns \
+      -c "$HERE/runtime/ssp.c" -o ssp.o
+    rm -f libssp.a
+    "$AR" rcs libssp.a ssp.o
+  )
   # Install beside the libgcc archive selected by precisely these flags.  The
   # libnix search collapses several CPU variants onto one directory; using it
   # here would let (for example) a 68060 build overwrite the 68000 runtime.
