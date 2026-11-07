@@ -258,8 +258,11 @@ esac
 printf '#include <math.h>\nvolatile double x = 0.5;\nint main(void) { return sin(x) > 0.4 ? 0 : 1; }\n' > "$C/fpret.c"
 for fl in "-m68020 -m68881" "-m68040 -m68881" "-m68040 -m68881 -fbaserel" "-m68040 -m68881 -fbaserel32" "-m68060"; do
   "$CC" $fl -O2 -noixemul -o "$C/fpret" "$C/fpret.c" -lm
-  "$PREFIX/bin/m68k-amigaos-objdump" -d "$C/fpret" | awk '/<_sin>:/ { s = 1 } s { print } s && /rts/ { exit }' |
-    grep -q 'fmoved.*%fp0' || { echo "$fl: sin does not return its result in fp0 (a soft-float libm was linked)"; exit 1; }
+  # through files, not a pipe: awk stops at the first rts, and with pipefail an
+  # objdump killed by SIGPIPE would fail the check on a right libm
+  "$PREFIX/bin/m68k-amigaos-objdump" -d "$C/fpret" > "$C/fpret.dis"
+  awk '/<_sin>:/ { s = 1 } s { print } s && /rts/ { exit }' "$C/fpret.dis" > "$C/fpret.sin"
+  grep -q 'fmoved.*%fp0' "$C/fpret.sin" || { echo "$fl: sin does not return its result in fp0 (a soft-float libm was linked)"; exit 1; }
 done
 printf 'volatile unsigned long s;\nint main(void) { s = *(volatile unsigned long *)0; return 0; }\n' > "$C/nullread.c"
 "$CC" -O2 -c -o "$C/nullread.o" "$C/nullread.c"
