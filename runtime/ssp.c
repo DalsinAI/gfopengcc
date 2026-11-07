@@ -24,6 +24,12 @@ init_stack_guard (void)
   mixed ^= (uintptr_t) &tv;
   mixed ^= *(volatile uintptr_t *) 4; /* ExecBase. */
   mixed *= (uintptr_t) 0x9e3779b1UL;
+  /* A multiplication never moves entropy downwards, and the inputs' low
+     bits barely change between runs (aligned addresses, the timer's
+     granularity): fold the high half back down before the top byte goes. */
+  mixed ^= mixed >> 16;
+  mixed *= (uintptr_t) 0x85ebca6bUL;
+  mixed ^= mixed >> 13;
   mixed &= ~((uintptr_t) 0xff << (sizeof (mixed) * 8 - 8));
   if (mixed == 0)
     mixed = (uintptr_t) 0x00d3a10aUL;

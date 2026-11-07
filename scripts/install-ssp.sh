@@ -43,6 +43,8 @@ while IFS=';' read -r dir options; do
     exit 1
   }
   destinations[$dest]=$dir
+  # Replace, never write through: a prefix may link its files from a stove.
+  rm -f "$dest"
   cp "$objdir/libssp.a" "$dest"
   for symbol in __stack_chk_guard __stack_chk_fail __stack_chk_fail_local; do
     # Amiga hunk symbols carry the ABI's leading underscore in nm output.
