@@ -117,12 +117,37 @@ passes.
 This confirmation pair froze before the later fd2sfd preparation change;
 the latter has the separate clean component rebuild evidence above.
 
+### What happened to r3
+
+r3 stopped at 22:23 UTC with status `failed`, stage `run 1: repro` and error
+`[Errno 32] Broken pipe`. Run 1's full build had completed; `repro.log` was
+never created. The runner raised the error itself, printing its next stage
+line to a stdout pipe whose reader had gone with the session that started
+it. It was a harness fault, not a regression: commit `d9ff412` records
+progress in `progress.log` and treats the console as best effort. See
+[the runtime record](open7-runtime-20261107.md#the-r3-confirmation-failure).
+
+## Fresh confirmation pair (7 November)
+
+`open7-offline-repro-20261107-r6` on amigachromebuild (12 cores, 10
+workers) froze orchestration at `a0a648a`, which includes the harness fix,
+the fd2sfd preparation, the 68040 maths seed fix (`5ba51d6`) and the stack
+guard mixing (`aee05df`). It uses the same pinned source commits from a
+local mirror and the same NDK input
+(`96cabd4ad683dced632e147bf86dee0f50dcb1254386216c25c362916a6409bb`),
+with the same socket-disabling filter. Two earlier attempts on 7 November
+(r4 and r5) were stopped by us when the runtime runs found the 68040 maths
+and stack guard defects, so that the pair would build the corrected tree.
+
+Status: running at the time of writing.
+
 ## AROS and remaining release work
 
 The separate clean AROS full-SDK offline build passed uninterrupted at
 21:08:53 UTC. See [the AROS receipt](open7-aros-libgcc-20261106.md).
 
-AmigaOS/AROS/AC090 runtime qualification, deliberate canary-corruption testing,
-the broader ABI execution corpus and representative AC090 performance/size
-measurements remain release work. The offline checks do not qualify those
-runtime behaviours or justify publishing Open7 as a finished release.
+Runtime qualification on AmigaOS, AROS and the AC090 instance, including
+the deliberate canary corruption, is recorded in
+[open7-runtime-20261107.md](open7-runtime-20261107.md). An AC090
+elapsed-time matrix is needed only before a future optimisation default
+change; Open7 changes none.
