@@ -1,0 +1,60 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: SacredTrees <121399723+SacredTrees@users.noreply.github.com>
+Date: Fri, 6 Nov 2026 18:20:00 +0000
+Subject: [PATCH] collect-aros: honor TMPDIR for temporary link files
+
+The no-libiberty fallback always writes intermediate linked images and
+response files beneath /tmp.  Large C++ links can therefore fail with EDQUOT
+even when the build volume has ample space and TMPDIR points there.  Use
+TMPDIR when it is nonempty, retaining /tmp as the compatibility fallback.
+---
+ misc.c | 25 ++++++++++++++++++++-----
+ 1 file changed, 20 insertions(+), 5 deletions(-)
+
+diff --git a/misc.c b/misc.c
+index ea2acbd..1111111 100644
+--- a/misc.c
++++ b/misc.c
+@@ -94,19 +94,35 @@
+ char *make_temp_file(char *suffix __attribute__((unused)))
+ {
+     int fd;
+-    /* If you're unlucky enough to not have libiberty available, you'll have
+-       to live with temporary files in /tmp and no suffix; it's ok for our own
+-       purposes,  */
+-    char template[] = "/tmp/catmpXXXXXX";
++    const char *tmpdir = getenv("TMPDIR");
++    const char stem[] = "catmpXXXXXX";
++    char *template;
++    size_t len;
++    int add_slash;
++
++    /* Keep the historical /tmp fallback, but let cross builds put their
++       potentially large intermediate links on the build volume.  */
++    if (tmpdir == NULL || tmpdir[0] == '\0')
++        tmpdir = "/tmp";
++    len = strlen(tmpdir);
++    add_slash = tmpdir[len - 1] != '/';
++    template = xmalloc(len + add_slash + sizeof(stem));
++    memcpy(template, tmpdir, len);
++    if (add_slash)
++        template[len++] = '/';
++    memcpy(template + len, stem, sizeof(stem));
+ 
+     fd = mkstemp(template);
+     if (fd == -1)
++    {
++        free(template);
+         return NULL;
++    }
+ 
+     if (close(fd) != 0)
+         fatal("make_temp_file()/close()", strerror(errno));
+ 
+-    return strdup(template);
++    return template;
+ }
+ 
+ #endif
+-- 
+2.47.3

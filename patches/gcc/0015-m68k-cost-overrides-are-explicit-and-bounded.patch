@@ -1,0 +1,93 @@
+Subject: [PATCH] m68k: make cost overrides explicit and bounded
+
+The m68k cost engine documented M68K_COSTS_FILE as its explicit override,
+but also loaded m68k-costs-speed.txt and m68k-costs-size.txt from the current
+directory.  A source tree could therefore silently change generated code
+without any command-line or environment difference.
+
+Keep only the explicit environment override.  Reject negative and extremely
+large values before they enter expressions in the cost engine.
+---
+ gcc/config/m68k/m68k_costs.cc | 35 +++++++++++++++++++++--------------
+ 1 file changed, 21 insertions(+), 14 deletions(-)
+
+diff --git a/gcc/config/m68k/m68k_costs.cc b/gcc/config/m68k/m68k_costs.cc
+index b9e6dc8..2a4259a 100644
+--- a/gcc/config/m68k/m68k_costs.cc
++++ b/gcc/config/m68k/m68k_costs.cc
+@@ -480,14 +480,24 @@ load_cost_overrides (const char *filename, int table[])
+           continue;
+ 
+         char name[128];
+-        int  value;
++        long value;
+ 
+-        if (sscanf (p, " %127[^= \t] = %d", name, &value) != 2)
++        if (sscanf (p, " %127[^= \t] = %ld", name, &value) != 2)
+           {
+             fprintf (stderr, "%s:%d: syntax error: %s", filename, lineno, line);
+             continue;
+           }
+ 
++        /* Costs are non-negative and are combined and multiplied by the
++           engine.  Keep enough headroom that an override cannot overflow
++           an int while GCC evaluates a normal m68k expression.  */
++        if (value < 0 || value > INT_MAX / 256)
++          {
++            fprintf (stderr, "%s:%d: cost value %ld is outside 0..%d\n",
++                     filename, lineno, value, INT_MAX / 256);
++            continue;
++          }
++
+         for (char *q = name; *q; q++)
+           if (*q >= 'A' && *q <= 'Z')
+             *q += 0x20;
+@@ -497,7 +507,7 @@ load_cost_overrides (const char *filename, int table[])
+           {
+             if (strcmp (cost_map[i].name, name) == 0)
+               {
+-                table[cost_map[i].index] = value;
++                table[cost_map[i].index] = (int) value;
+                 found = 1;
+                 break;
+               }
+@@ -516,22 +526,21 @@ load_cost_overrides (const char *filename, int table[])
+    ============================================ */
+ 
+ static void
+-m68k_init_costs (bool speed)
++m68k_init_costs (void)
+ {
+     m68k_select_cost_tables ();
+ 
+-    /* Overrides apply to whichever table is active for this build. */
++    /* Tuning must be explicit.  In particular, never inspect the current
++       directory: doing so makes otherwise identical builds generate
++       different code merely because a project contains a specially named
++       file.  The environment variable is deliberately the only override
++       mechanism.  */
+     const char *env = getenv ("M68K_COSTS_FILE");
+     if (env && *env)
+       {
+         load_cost_overrides (env, active_speed);
+         load_cost_overrides (env, active_size);
+-        return;
+       }
+-
+-    /* Look for override files in the current directory */
+-    load_cost_overrides ("m68k-costs-speed.txt", active_speed);
+-    load_cost_overrides ("m68k-costs-size.txt",  active_size);
+ }
+ 
+ /* ============================================
+@@ -988,7 +997,7 @@ m68k_costs (rtx x,
+     if (!initialized)
+       {
+         initialized = true;
+-        m68k_init_costs (speed);
++        m68k_init_costs ();
+       }
+     return m68k_costs_engine (x, mode, outer_code, opno, total, speed);
+ }
+-- 
+2.51.0

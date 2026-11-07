@@ -16,6 +16,7 @@ git am /path/to/patches/libnix/*.patch      # or: patch -p1 < each file, in orde
 | `0006-setlocale-…` | `setlocale()` from several threads at once (libstdc++ calls it for every number a stream converts) frees the same name twice and closes the same locale twice; the saved name can't be set back | `docs/libnix-setlocale.md` |
 | `0007-cxxglue-__initcpp-…` | under `-fbaserel`/`-fbaserel32`, `__init_eh` and `__initcpp` addressed the `.list` sections (in the code hunk) from a4: `-fbaserel` C++ failed to link and `-fbaserel32` C++ hung before `main` | `tests/baserel/FINDINGS.md` |
 | `0008-strtol-strtoul-…` | empty-input conversion leaves `endptr` untouched; `strtol` also consumes an uninitialised end pointer after whitespace-only input | `docs/libnix-strtol-endptr.md`; native original/fixed control in `tests/libnix/strtol_endptr.c` |
+| `0009-libnix4-exclude-…` | `libnix4.library` exports and links `__vfwprintf_total_size` twice because `preplib` excludes a misspelled object name | `tests/libnix4-source-list.sh`; the `FULL_SPECIFIERS` math copy is retained, as for `__vfprintf_total_size` |
 
 Then rebuild libnix (`make libnix` in amiga-gcc, or `Makefile.gcc6 all install`). Built with the GCC 16.2 stove at `-O2`, the unpatched source gives a `libnix20.a`, `libnix13.a` and start code byte-identical to the stove's.
 

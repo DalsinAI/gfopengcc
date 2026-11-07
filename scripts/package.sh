@@ -7,6 +7,8 @@
 # GFOpenNDK's (docs/openndk-libamiga.md).
 # GPL-3.0-or-later. Copyright (c) 2026 AmiCradle Team.
 set -euo pipefail
+# Package directory modes must not depend on the caller's umask.
+umask 022
 WORK=$(cd "$1" && pwd); PREFIX=$(cd "$2" && pwd); mkdir -p "$3"; OUT=$(cd "$3" && pwd); V=$4
 HERE=$(cd "$(dirname "$0")/.." && pwd)
 # Named gfopenamigagcc-* from open5; open1 to open4 were openamigagcc-*.
@@ -21,13 +23,23 @@ rsync -a --no-group --exclude '/m68k-amigaos/ndk/' --exclude '/m68k-amigaos/ndk-
 # The source: amiga-gcc and its modules as built (patches applied), and this repository.
 mkdir -p "$S/$SRC/amiga-gcc" "$S/$SRC/gfopengcc"
 rsync -a --no-group --exclude '.git' --exclude '/build-*/' --exclude '/download/' --exclude '/log/' \
-  --exclude '/gfopenamigagcc-logs/' --exclude '/openamigagcc-logs/' --exclude '/projects/NDK3.2*' --exclude '/projects/gfopensdk/OpenNDK/lib/build/' \
+  --exclude '/gfopenamigagcc-logs/' --exclude '/openamigagcc-logs/' --exclude '/.gfopenamigagcc-tmp/' --exclude '__pycache__' --exclude '*.pyc' --exclude 'autom4te.cache' --exclude '/projects/fd2sfd/configure~' --exclude '/projects/NDK3.2*' --exclude '/projects/gfopensdk/OpenNDK/lib/build/' \
   "$WORK/" "$S/$SRC/amiga-gcc/"
 rsync -a --no-group --exclude '.git' --exclude '__pycache__' "$HERE/" "$S/$SRC/gfopengcc/"
+
+# No private AmiCradle repository checkout (amicradle-guest, amicradle-storage)
+# may go into a public release.
+bad=$(cd "$S" && find . \( -iname 'amicradle-guest*' -o -iname 'amicradle-storage*' -o -name 'AMIGACHROME_GUEST_PINNED_COMMIT' \) -print | head -5)
+[ -z "$bad" ] || { echo "private AmiCradle sources in the release: $bad"; exit 1; }
 
 # Nothing of the NDK, and every libamiga.a GFOpenNDK's.
 bad=$(cd "$S" && find . \( -path '*/projects/NDK3.2*' -o -name 'NDK3.2.lha' -o -iname 'amiga.lib' -o -name 'ndk-include' -o -name 'ndk13-include' \) -print | head -5)
 [ -z "$bad" ] || { echo "NDK files in the release: $bad"; exit 1; }
+[ -f "$S/$BIN/share/gfopenamigagcc/provenance/all-patches.sha256" ] || {
+  echo "installed provenance bundle is missing from the binary release"; exit 1;
+}
+( cd "$S/$BIN/share/gfopenamigagcc/provenance" && sha256sum -c all-patches.sha256 ) \
+  || { echo "installed provenance patch hashes do not verify"; exit 1; }
 n=0
 while IFS= read -r a; do
   "$PREFIX/bin/m68k-amigaos-ar" t "$a" | grep -x rexxvar.o > /dev/null || { echo "${a#"$S"/} is not GFOpenNDK's libamiga.a"; exit 1; }
@@ -35,5 +47,5 @@ while IFS= read -r a; do
 done < <(find "$S" -name 'libamiga.a')
 echo "libamiga.a: $n in the release, all GFOpenNDK's"
 
-( cd "$S" && tar --owner=0 --group=0 -cJf "$OUT/$BIN.tar.xz" "$BIN" && tar --owner=0 --group=0 -cJf "$OUT/$SRC.tar.xz" "$SRC" )
+( cd "$S" && tar --mode=u+rwX,go+rX,go-w --owner=0 --group=0 -cJf "$OUT/$BIN.tar.xz" "$BIN" && tar --mode=u+rwX,go+rX,go-w --owner=0 --group=0 -cJf "$OUT/$SRC.tar.xz" "$SRC" )
 ( cd "$OUT" && sha256sum "$BIN.tar.xz" "$SRC.tar.xz" > SHA256SUMS && cat SHA256SUMS )
