@@ -12,7 +12,7 @@ on:
   workflow_dispatch:
     inputs:
       release:
-        description: 'Publish this build as a release, e.g. 16.2.0-open6 (needs docs/releases/<version>.md); empty builds only'
+        description: 'Publish this build as a release, e.g. 16.2.0-open7 (needs docs/releases/<version>.md); empty builds only'
         required: false
         default: ''
 
@@ -45,12 +45,21 @@ jobs:
       - name: Host tools
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq build-essential bison flex gperf texinfo \
+          sudo apt-get install -y -qq build-essential bison flex gperf texinfo install-info \
             libgmp-dev libmpfr-dev libmpc-dev rsync git lhasa autoconf gettext \
             libncurses-dev libreadline-dev qemu-user python3
 
       - name: Release names agree
         run: tests/release-names.sh ${{ inputs.release }}
+
+      - name: Compiler output readers drain their input
+        run: python3 tests/compiler-output.py
+
+      - name: Exclusive build work folder
+        run: tests/build-lock.sh
+
+      - name: Shared libnix source list
+        run: tests/libnix4-source-list.sh
 
       - name: Fetch sources
         run: scripts/fetch.sh "$WORK"
@@ -66,6 +75,22 @@ jobs:
           tests/repro/prove.sh "$PREFIX/bin"
           tests/repro/prove.sh "$PREFIX/bin" -fno-tree-loop-distribute-patterns
 
+      - name: Optimiser correctness and code-size matrix
+        run: OUT="$RUNNER_TEMP/optimizer" tests/optimizer/check.sh "$PREFIX/bin"
+
+      - name: Defined-behaviour optimiser differential fuzzing
+        run: OUT="$RUNNER_TEMP/optimizer-fuzz" python3 tests/optimizer/fuzz.py "$PREFIX/bin" 12
+
+      - name: UBSan trap checks without a sanitizer runtime
+        run: OUT="$RUNNER_TEMP/ubsan-trap" python3 tests/ubsan-trap/check.py "$PREFIX/bin"
+
+      - name: Keep UBSan trap evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ubsan-trap-evidence
+          path: ${{ runner.temp }}/ubsan-trap/
+
       - name: PR123853 (patches/gcc/0013) for m68k-amigaos, with the autoinc scanner
         run: tests/autoinc/check.sh --amigaos "$PREFIX/bin"
 
@@ -77,6 +102,9 @@ jobs:
 
       - name: Base-relative C++ exception data
         run: tests/baserel/eh-check.sh "$PREFIX"
+
+      - name: Dedicated 68040 AmigaOS multilibs
+        run: tests/amigaos-multilib.sh "$PREFIX"
 
       - name: Compile the AmigaOS-only tests
         run: |

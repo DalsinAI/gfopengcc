@@ -11,7 +11,18 @@
 set -euo pipefail
 WORK=$(cd "$1" && pwd); PREFIX=$2; NDK=$3; JOBS=${4:-$(nproc)}
 HERE=$(cd "$(dirname "$0")/.." && pwd)
+command -v flock >/dev/null || { echo "flock is required to protect the build work folder"; exit 1; }
+exec 9>"$WORK/.gfopenamigagcc-build.lock"
+flock -n 9 || { echo "another GFOpenAmigaGCC build is using $WORK"; exit 1; }
 mkdir -p "$PREFIX"; PREFIX=$(cd "$PREFIX" && pwd)
+# Host compilers and configure probes otherwise default to /tmp, which may
+# have a much smaller quota than the selected build volume. Keep their
+# temporary files inside the exclusively locked work folder unless the caller
+# deliberately supplied another TMPDIR.
+GFOPEN_TMPDIR=${TMPDIR:-$WORK/.gfopenamigagcc-tmp}
+mkdir -p "$GFOPEN_TMPDIR"
+GFOPEN_TMPDIR=$(cd "$GFOPEN_TMPDIR" && pwd)
+export TMPDIR=$GFOPEN_TMPDIR
 LOGS=$WORK/gfopenamigagcc-logs; mkdir -p "$LOGS"
 NOFETCH=""
 if unshare -n --map-current-user true 2>/dev/null; then NOFETCH="unshare -n --map-current-user"; fi
@@ -68,6 +79,7 @@ apply "$WORK/projects/gcc" "$HERE"/patches/gcc/*.patch
 apply "$WORK" "$HERE"/patches/amiga-gcc/*.patch
 apply "$WORK/projects/libnix" "$HERE"/patches/libnix/*.patch ${LIBNIX_PATCHES:+"$LIBNIX_PATCHES"/*.patch}
 apply "$WORK/projects/aros-stuff" "$HERE"/patches/aros-stuff/*.patch
+apply "$WORK/projects/gfopensdk" "$HERE"/patches/gfopensdk/*.patch
 cp "$HERE"/sys-include/*.h "$WORK/sys-include/"
 # Roadshow's bsdsocket.h and usergroup.h inlines (amiga-netinclude, installed
 # beside the NDK's) clobber registers their arguments sit in; GCC 16 refuses
@@ -95,6 +107,10 @@ rsync -a --no-group "$WORK/projects/libnix/sources/headers/" "$PREFIX/m68k-amiga
 
 # 5. The toolchain: binutils, GCC, libnix, libpthread, the NDK's headers and
 #    libraries.
+# Regenerate this old helper's configure script explicitly: its Makefile
+# otherwise chooses between Autoconf 2.52 and the host version based on the
+# checkout order of configure and configure.in.
+bash "$HERE/scripts/prepare-fd2sfd.sh" "$WORK/projects/fd2sfd"
 #    The driver leaves loop distribution on (patch 0009), so the C library is
 #    built without it: libnix defines memcpy, memmove, memset, calloc, bcopy
 #    and bzero itself, and a loop in one of them must never become a call to
@@ -113,14 +129,64 @@ for f in bin/m68k-amigaos-gprof m68k-amigaos/ndk-include/exec/types.h m68k-amiga
   [ -e "$PREFIX/$f" ] || { echo "the amiga-gcc build did not install $f (see $LOGS/make.log and $WORK/log)"; exit 1; }
 done
 
+# The framework builds libnix and libpthread for 68020, whose ISA and ABI are
+# valid on 68040. GCC now builds CPU-sensitive target libraries in a dedicated
+# libm040 multilib; seed matching C-runtime folders so neither plain nor
+# base-relative links, with or without hard float, fall back to an incompatible
+# directory. GFOpenNDK's libamiga.a is replaced by a native per-multilib build
+# in the next step.
+# Each libm040 folder gets its libm020 folder's files. Its libm881 subfolder
+# gets the same files with libm020/libm881's hard-float members on top: the
+# hard-float libm.a (and crt0/libc where the framework builds them) must win,
+# because its routines return doubles in fp0. Copying only the soft files
+# there made every -m68040 -m68881 call of sin, exp, log and the other libm
+# routines read a stale fp0 (their soft versions return in d0/d1).
+say "68040 C runtime compatibility directories"
+T=$PREFIX/m68k-amigaos
+for root in "$T/lib" "$T/libnix/lib"; do
+  for rel in libm020 libb/libm020 libb32/libm020; do
+    src=$root/$rel
+    dst=$root/${rel/libm020/libm040}
+    [ -d "$src/libm881" ] || { echo "missing 68020 runtime source directory $src/libm881"; exit 1; }
+    rm -rf "$dst"
+    mkdir -p "$dst/libm881"
+    find "$src" -maxdepth 1 -type f -exec cp -a {} "$dst/" \;
+    find "$src" -maxdepth 1 -type f -exec cp -a {} "$dst/libm881/" \;
+    cp -a "$src/libm881/." "$dst/libm881/"
+    for f in "$src"/*; do
+      [ ! -f "$f" ] || cmp -s "$f" "$dst/${f##*/}" || { echo "68040 runtime seed: $dst/${f##*/} differs from $f"; exit 1; }
+    done
+    for f in "$src/libm881"/*; do
+      cmp -s "$f" "$dst/libm881/${f##*/}" || { echo "68040 runtime seed: $dst/libm881/${f##*/} is not the hard-float $f"; exit 1; }
+    done
+  done
+done
+for f in \
+  "$T/lib/libm040/libpthread.a" \
+  "$T/lib/libm040/libm881/libpthread.a" \
+  "$T/lib/libb/libm040/libpthread.a" \
+  "$T/lib/libb/libm040/libm881/libpthread.a" \
+  "$T/lib/libb32/libm040/libpthread.a" \
+  "$T/lib/libb32/libm040/libm881/libpthread.a" \
+  "$T/libnix/lib/libm040/libnix.a" \
+  "$T/libnix/lib/libm040/libm881/libnix.a" \
+  "$T/libnix/lib/libm040/libm881/libm.a" \
+  "$T/libnix/lib/libb/libm040/libnix.a" \
+  "$T/libnix/lib/libb/libm040/libm881/libnix.a" \
+  "$T/libnix/lib/libb/libm040/libm881/libm.a" \
+  "$T/libnix/lib/libb32/libm040/libnix.a" \
+  "$T/libnix/lib/libb32/libm040/libm881/libnix.a" \
+  "$T/libnix/lib/libb32/libm040/libm881/libm.a"; do
+  [ -s "$f" ] || { echo "68040 runtime seed did not produce $f"; exit 1; }
+done
+
 # 5b. libamiga.a, from GFOpenNDK (projects/gfopensdk, pinned in
 #     scripts/sources.lock), in every multilib folder, each built with that
-#     multilib's own flags: "libm020/libm881;@mcpu=68020@m68881" gets
-#     -mcpu=68020 -m68881, "libb;@fbaserel" -fbaserel. GFOpenNDK's lib/build.sh puts
-#     -m68040 first, so a multilib that names no CPU gets -m68000 (this
-#     GCC's default) after it: the last CPU flag wins. Each old file is
-#     removed first, so a link to it (a stove's) is replaced, never written
-#     through. docs/openndk-libamiga.md.
+#     multilib's own flags: "libm040/libm881;@mcpu=68040@m68881" gets
+#     -mcpu=68040 -m68881 and "libb;@fbaserel" gets -m68000 -fbaserel.
+#     A multilib that names no CPU receives explicit -m68000 (this GCC's
+#     default). Each old file is removed first, so a link to it (a stove's) is
+#     replaced, never written through. docs/openndk-libamiga.md.
 say "libamiga.a from GFOpenNDK"
 OPENNDK=$WORK/projects/gfopensdk/OpenNDK
 T=$PREFIX/m68k-amigaos
@@ -128,12 +194,15 @@ T=$PREFIX/m68k-amigaos
   fl=${flags//@/ -}
   case " $fl " in *" -mcpu="*|*" -m680"[0-6]"0 "*) ;; *) fl="-m68000$fl" ;; esac
   log=$LOGS/openndk-libamiga-$([ "$dir" = . ] && echo plain || echo "${dir//\//-}").log
-  ( PREFIX="$PREFIX/bin/m68k-amigaos-" EXTRA_CFLAGS="$fl" sh "$OPENNDK/lib/build.sh" ) > "$log" 2>&1 \
+  ( PREFIX="$PREFIX/bin/m68k-amigaos-" EXTRA_CFLAGS="$fl" JOBS="$JOBS" sh "$OPENNDK/lib/build.sh" ) > "$log" 2>&1 \
     || { echo "GFOpenNDK's libamiga.a for multilib '$dir' ($fl) failed (see $log)"; exit 1; }
   mkdir -p "$T/lib/$dir"
   rm -f "$T/lib/$dir/libamiga.a"
   cp "$OPENNDK/lib/build/m68k-amigaos/libamiga.a" "$T/lib/$dir/libamiga.a"
 done
+if grep -aF '68040/68060/68080 and 68851 specified' "$LOGS"/openndk-libamiga-*.log >/dev/null; then
+  echo "GFOpenNDK used contradictory CPU options (see $LOGS/openndk-libamiga-*.log)"; exit 1
+fi
 
 # 6. libgcc, libstdc++ and the other target libraries, against libnix's
 #    headers, so libstdc++'s configure sees C99 maths, dirent and chdir.
@@ -150,29 +219,48 @@ for f in $(find "$PREFIX/lib/gcc/m68k-amigaos" -path "*include/c++*" -name c++co
   done
 done
 
-# 6b. libnix4.a (the static part of the shared libnix, for -mcrt=library). The
-#     shared libnix4.library itself does not link (a duplicate
-#     __vfwprintf_total_size export); static programs don't need it.
+# 6b. Shared libnix and its static support archive, for -mcrt=library.
 echo done > "$WORK/build-Linux-m68k-amigaos/gcc/_libgcc_done"   # step 6 built and installed them
-( cd "$WORK" && $NOFETCH make libnix4.library PREFIX="$PREFIX" THREADS=posix NDK=3.2 ) > "$LOGS/libnix4.log" 2>&1 || true
-if [ -f "$WORK/build-Linux-m68k-amigaos/libnix/libb/libnix4.a" ]; then
-  cp "$WORK/build-Linux-m68k-amigaos/libnix/libb/libnix4.a" "$PREFIX/m68k-amigaos/libnix/lib/libb/"
-fi
+( cd "$WORK" && $NOFETCH make libnix4.library PREFIX="$PREFIX" THREADS=posix NDK=3.2 ) > "$LOGS/libnix4.log" 2>&1 || {
+  echo "libnix4 failed (see $LOGS/libnix4.log)"; exit 1;
+}
+for f in \
+  "$WORK/build-Linux-m68k-amigaos/libnix/libb/libnix4.a" \
+  "$WORK/build-Linux-m68k-amigaos/libnix/libb/libnix4.library"; do
+  [ -s "$f" ] || { echo "libnix4 did not produce $f"; exit 1; }
+done
+cp "$WORK/build-Linux-m68k-amigaos/libnix/libb/libnix4.a" "$PREFIX/m68k-amigaos/libnix/lib/libb/"
+
+# 6c. Stack-protector support is absent from libnix. Install the small Open7
+#     runtime into every advertised multilib before exercising the driver.
+say "stack-protector runtime"
+"$HERE/scripts/install-ssp.sh" "$PREFIX"
 
 # 7. Checks.
 say checks
 CC="$PREFIX/bin/m68k-amigaos-gcc"
 C=$LOGS/check; mkdir -p "$C"
 # The identity patches/amiga-gcc/0002 gives it (tests/release-names.sh keeps them in step).
-ID="GFOpenAmigaGCC 16.2.0-open6"
-"$CC" --version | head -1 | grep -Fq "($ID)" || {
+ID="GFOpenAmigaGCC 16.2.0-open7"
+"$CC" --version | sed -n '1p' | grep -F "($ID)" > /dev/null || {
   echo "gcc does not identify itself as $ID"; exit 1;
 }
-link_cpu=$("$CC" -dumpspecs | sed -n '/^\*link_cpu:/{n;p;q;}')
+"$HERE/tests/cost-model/check.sh" "$PREFIX/bin"
+"$HERE/tests/hardening/check.sh" "$PREFIX/bin"
+"$HERE/tests/amigaos-multilib.sh" "$PREFIX"
+link_cpu=$(bash "$HERE/scripts/read-link-cpu.sh" "$CC")
 case "$link_cpu" in
   *'mhard-float|m68881|mcpu=6804'* )
     echo "-m68040 still selects the hard-float libm881"; exit 1 ;;
 esac
+# A hard-float link must take the hard-float maths, whose results come back
+# in fp0 where the caller reads them (soft-float members return in d0/d1).
+printf '#include <math.h>\nvolatile double x = 0.5;\nint main(void) { return sin(x) > 0.4 ? 0 : 1; }\n' > "$C/fpret.c"
+for fl in "-m68020 -m68881" "-m68040 -m68881" "-m68040 -m68881 -fbaserel" "-m68040 -m68881 -fbaserel32" "-m68060"; do
+  "$CC" $fl -O2 -noixemul -o "$C/fpret" "$C/fpret.c" -lm
+  "$PREFIX/bin/m68k-amigaos-objdump" -d "$C/fpret" | awk '/<_sin>:/ { s = 1 } s { print } s && /rts/ { exit }' |
+    grep -q 'fmoved.*%fp0' || { echo "$fl: sin does not return its result in fp0 (a soft-float libm was linked)"; exit 1; }
+done
 printf 'volatile unsigned long s;\nint main(void) { s = *(volatile unsigned long *)0; return 0; }\n' > "$C/nullread.c"
 "$CC" -O2 -c -o "$C/nullread.o" "$C/nullread.c"
 if "$PREFIX/bin/m68k-amigaos-objdump" -d "$C/nullread.o" | grep -E 'trap +#7' > /dev/null; then echo "a read of address 0 still compiles to trap #7"; exit 1; fi
@@ -240,4 +328,12 @@ printf '#include <proto/exec.h>\n#include <clib/alib_protos.h>\nint main(void) {
 grep -q 'gfopensdk/OpenNDK\|libamiga.a(newlist.o)' "$C/alib.map" || { echo "a NewList program did not link GFOpenNDK's libamiga.a"; exit 1; }
 echo "libamiga.a: $n copies, all GFOpenNDK's; every multilib links its own"
 echo "defaults: $("$CC" -### -c -x c /dev/null 2>&1 | grep -o -- '-fno-[a-z-]*' | sort -u | tr '\n' ' ')"
+say "multicore-safe fpuauto"
+FPUAUTO=$HERE/runtime/fpuauto
+[ -x "$FPUAUTO/install-prefix.sh" ] || {
+  echo "missing fpuauto installer at $FPUAUTO/install-prefix.sh"; exit 1;
+}
+"$FPUAUTO/install-prefix.sh" "$PREFIX" "$WORK/build-fpuauto"
+bash "$HERE/scripts/rebuild-info-index.sh" "$PREFIX/share/info"
+"$HERE/scripts/install-provenance.sh" "$WORK" "$PREFIX"
 echo "GFOpenAmigaGCC built in $PREFIX"

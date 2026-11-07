@@ -20,9 +20,13 @@ set -euo pipefail
 WORK=$(cd "$1" && pwd); PREFIX=$2; SYSROOT=$3; JOBS=${4:-$(nproc)}
 HERE=$(cd "$(dirname "$0")/.." && pwd)
 mkdir -p "$PREFIX"; PREFIX=$(cd "$PREFIX" && pwd)
+if [ -z "${TMPDIR:-}" ]; then
+  TMPDIR=$WORK/.gfopenamigagcc-tmp
+fi
+mkdir -p "$TMPDIR"; TMPDIR=$(cd "$TMPDIR" && pwd); export TMPDIR
 A=$WORK/aros; S=$A/src; B=$A/build; LOGS=$A/logs; mkdir -p "$LOGS"
 # The identity scripts/build.sh gives the m68k-amigaos GCC (tests/release-names.sh keeps them in step).
-ID="GFOpenAmigaGCC 16.2.0-open6"
+ID="GFOpenAmigaGCC 16.2.0-open7"
 T=m68k-aros
 say() { echo "== $*"; }
 if [ "$SYSROOT" = none ]; then
@@ -52,7 +56,12 @@ tar -C "$S" -xf "$A/binutils-2.47.tar.bz2"
 tar -C "$S" -xf "$A/isl-0.27.tar.xz" && mv "$S/isl-0.27" "$S/gcc-16.2.0/isl"   # built in tree
 grep -v '^#' "$HERE/patches/aros/series" | while read -r tree p; do
   [ -n "$tree" ] || continue
-  case $tree in gcc) d=$S/gcc-16.2.0 ;; binutils) d=$S/binutils-2.47 ;; *) echo "series: no tree $tree"; exit 1 ;; esac
+  case $tree in
+    gcc) d=$S/gcc-16.2.0 ;;
+    binutils) d=$S/binutils-2.47 ;;
+    collect-aros) d=$AROS/tools/collect-aros ;;
+    *) echo "series: no tree $tree"; exit 1 ;;
+  esac
   ( cd "$d" && patch -p1 -s -F0 -f --dry-run < "$HERE/patches/$p" > /dev/null ) || { echo "does not apply: patches/$p"; exit 1; }
   ( cd "$d" && patch -p1 -s -F0 -f --no-backup-if-mismatch < "$HERE/patches/$p" )
   echo "applied $p"
@@ -94,7 +103,7 @@ mkdir -p "$B/gcc"
     --with-pkgversion="$ID" ) > "$LOGS/gcc-configure.log" 2>&1 || { echo "gcc configure failed (see $LOGS/gcc-configure.log)"; exit 1; }
 ( cd "$B/gcc" && make -j"$JOBS" all-gcc && make -j1 install-gcc ) > "$LOGS/gcc.log" 2>&1 \
   || { echo "gcc failed (see $LOGS/gcc.log)"; exit 1; }
-"$PREFIX/$T-gcc" --version | head -1 | grep -Fq "($ID)" || { echo "m68k-aros-gcc does not identify itself as $ID"; exit 1; }
+"$PREFIX/$T-gcc" --version | sed -n '1p' | grep -F "($ID)" > /dev/null || { echo "m68k-aros-gcc does not identify itself as $ID"; exit 1; }
 
 if [ "$FULL" = 1 ]; then
   say "libgcc and libstdc++ against $SR"
@@ -135,12 +144,14 @@ printf 'int f(int *p, int n) { int s = 0; while (n--) s += *p++; return s; }\n' 
 "$PREFIX/$T-gcc" -m68040 -O2 -c -o "$C/sum.o" "$C/sum.c"
 "$PREFIX/$T-objdump" -f "$C/sum.o" | grep -q 'elf32-m68k' || { echo "$T-gcc did not make an m68k ELF object"; exit 1; }
 if [ "$FULL" = 1 ]; then
+  "$HERE/tests/aros-libgcc.sh" "$PREFIX"
   printf '#include <stdio.h>\nint main(void) { printf("hello\\n"); return 0; }\n' > "$C/hello.c"
   "$PREFIX/$T-gcc" -m68040 -O2 -o "$C/hello" "$C/hello.c"
-  # C++ as the aros68k-gcc16 stove's tests link it (libstdc++ locks through pthread, whose init
-  # entry only an early reference keeps), at the default CPU: a -m68040 C++
-  # link is left with __divsi3 undefined (the aros68k-gcc16 stove's too)
-  "$PREFIX/$T-g++" -O2 -std=c++23 -o "$C/hellocxx" -x c++ - -x none -Wl,-u,__pthread_Init_Func -lpthread -latomic <<'CXX'
+  # C++ as the aros68k-gcc16 stove's tests link it (libstdc++ locks through
+  # pthread, whose init entry only an early reference keeps).  Keep -m68040:
+  # Open6's notes recorded an unresolved __divsi3 here, although the installed
+  # Open6 and archived predecessor now both pass this exact link.
+  "$PREFIX/$T-g++" -m68040 -O2 -std=c++23 -o "$C/hellocxx" -x c++ - -x none -Wl,-u,__pthread_Init_Func -lpthread -latomic <<'CXX'
 #include <vector>
 #include <algorithm>
 #include <cstdio>
@@ -148,4 +159,4 @@ int main() { std::vector<int> v{3, 1, 2}; std::sort(v.begin(), v.end()); std::pr
 CXX
   echo "linked a C and a C++ program against $SR"
 fi
-echo "$("$PREFIX/$T-gcc" --version | head -1) built in $PREFIX"
+echo "$("$PREFIX/$T-gcc" --version | sed -n '1p') built in $PREFIX"

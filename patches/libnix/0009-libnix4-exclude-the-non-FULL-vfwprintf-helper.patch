@@ -1,0 +1,36 @@
+From 2b7f193d4a56e2cf51f947764af88688150e6636 Mon Sep 17 00:00:00 2001
+From: AmiCradle Team <team@amicradle.example>
+Date: Fri, 6 Nov 2026 15:30:00 +0000
+Subject: [PATCH] libnix4: exclude the non-FULL vfwprintf helper
+
+The math library deliberately recompiles __vfwprintf_total_size.c with
+FULL_SPECIFIERS.  preplib already excludes the corresponding ordinary nix
+object for the narrow printf helper, but the wide helper's exclusion was
+misspelled as __vwfprintf_total_size.o.
+
+Consequently libnix4's definition and object lists contained both copies of
+__vfwprintf_total_size, so export-libnix4.c did not compile and the shared
+library did not link.  Exclude the actual ordinary object and keep the math
+library's FULL_SPECIFIERS implementation, matching __vfprintf_total_size.
+
+The libnix source is public domain; this change is public domain too.
+---
+ preplib | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/preplib b/preplib
+index 29f892a..78e6445 100755
+--- a/preplib
++++ b/preplib
+@@ -22,7 +22,7 @@ find nix -name "*.o" \
+   -not -name vsprintf.o  \
+   -not -name vsscanf.o  \
+   -not -name __vfprintf_total_size.o \
+-  -not -name __vwfprintf_total_size.o \
++  -not -name __vfwprintf_total_size.o \
+   -not -name tmpfile.o  \
+   > ofiles.txt
+ find nix20   -name "*.o" \
+-- 
+2.47.3
+
