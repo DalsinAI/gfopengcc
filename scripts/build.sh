@@ -135,32 +135,35 @@ done
 # base-relative links, with or without hard float, fall back to an incompatible
 # directory. GFOpenNDK's libamiga.a is replaced by a native per-multilib build
 # in the next step.
+# Each libm040 folder is an exact copy of its libm020 folder, including its
+# libm881 subfolder: libm881 holds only the hard-float members (libnix's libm.a
+# returns doubles in fp0) and the linker finds everything else one level up.
+# Copying the soft-float libm020 files into libm040/libm881 made every
+# -m68040 -m68881 call of sin, exp, log and the other libm routines read a
+# stale fp0, because those soft members return their result in d0/d1.
 say "68040 C runtime compatibility directories"
 T=$PREFIX/m68k-amigaos
 for root in "$T/lib" "$T/libnix/lib"; do
   for rel in libm020 libb/libm020 libb32/libm020; do
     src=$root/$rel
-    [ -d "$src" ] || { echo "missing 68020 runtime source directory $src"; exit 1; }
-    for suffix in '' /libm881; do
-      dst=$root/${rel/libm020/libm040}$suffix
-      mkdir -p "$dst"
-      cp -a "$src/." "$dst/"
-    done
+    dst=$root/${rel/libm020/libm040}
+    [ -d "$src/libm881" ] || { echo "missing 68020 runtime source directory $src/libm881"; exit 1; }
+    rm -rf "$dst"
+    mkdir -p "$dst"
+    cp -a "$src/." "$dst/"
+    diff -r "$src" "$dst" > /dev/null || { echo "68040 runtime seed $dst differs from $src"; exit 1; }
   done
 done
 for f in \
   "$T/lib/libm040/libpthread.a" \
-  "$T/lib/libm040/libm881/libpthread.a" \
   "$T/lib/libb/libm040/libpthread.a" \
-  "$T/lib/libb/libm040/libm881/libpthread.a" \
   "$T/lib/libb32/libm040/libpthread.a" \
-  "$T/lib/libb32/libm040/libm881/libpthread.a" \
   "$T/libnix/lib/libm040/libnix.a" \
-  "$T/libnix/lib/libm040/libm881/libnix.a" \
+  "$T/libnix/lib/libm040/libm881/libm.a" \
   "$T/libnix/lib/libb/libm040/libnix.a" \
-  "$T/libnix/lib/libb/libm040/libm881/libnix.a" \
+  "$T/libnix/lib/libb/libm040/libm881/libm.a" \
   "$T/libnix/lib/libb32/libm040/libnix.a" \
-  "$T/libnix/lib/libb32/libm040/libm881/libnix.a"; do
+  "$T/libnix/lib/libb32/libm040/libm881/libm.a"; do
   [ -s "$f" ] || { echo "68040 runtime seed did not produce $f"; exit 1; }
 done
 
@@ -237,6 +240,14 @@ case "$link_cpu" in
   *'mhard-float|m68881|mcpu=6804'* )
     echo "-m68040 still selects the hard-float libm881"; exit 1 ;;
 esac
+# A hard-float link must take the hard-float maths, whose results come back
+# in fp0 where the caller reads them (soft-float members return in d0/d1).
+printf '#include <math.h>\nvolatile double x = 0.5;\nint main(void) { return sin(x) > 0.4 ? 0 : 1; }\n' > "$C/fpret.c"
+for fl in "-m68020 -m68881" "-m68040 -m68881" "-m68040 -m68881 -fbaserel" "-m68040 -m68881 -fbaserel32" "-m68060"; do
+  "$CC" $fl -O2 -noixemul -o "$C/fpret" "$C/fpret.c" -lm
+  "$PREFIX/bin/m68k-amigaos-objdump" -d "$C/fpret" | awk '/<_sin>:/ { s = 1 } s { print } s && /rts/ { exit }' |
+    grep -q 'fmoved.*%fp0' || { echo "$fl: sin does not return its result in fp0 (a soft-float libm was linked)"; exit 1; }
+done
 printf 'volatile unsigned long s;\nint main(void) { s = *(volatile unsigned long *)0; return 0; }\n' > "$C/nullread.c"
 "$CC" -O2 -c -o "$C/nullread.o" "$C/nullread.c"
 if "$PREFIX/bin/m68k-amigaos-objdump" -d "$C/nullread.o" | grep -E 'trap +#7' > /dev/null; then echo "a read of address 0 still compiles to trap #7"; exit 1; fi
