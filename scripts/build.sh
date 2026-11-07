@@ -329,7 +329,7 @@ grep -q 'gfopensdk/OpenNDK\|libamiga.a(newlist.o)' "$C/alib.map" || { echo "a Ne
 echo "libamiga.a: $n copies, all GFOpenNDK's; every multilib links its own"
 echo "defaults: $("$CC" -### -c -x c /dev/null 2>&1 | grep -o -- '-fno-[a-z-]*' | sort -u | tr '\n' ' ')"
 say "multicore-safe fpuauto"
-FPUAUTO=$WORK/projects/amicradle-guest/common/fpuauto
+FPUAUTO=$HERE/runtime/fpuauto
 [ -x "$FPUAUTO/install-prefix.sh" ] || {
   echo "missing fpuauto installer at $FPUAUTO/install-prefix.sh"; exit 1;
 }

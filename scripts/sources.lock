@@ -12,5 +12,5 @@ fd2pragma         https://github.com/adtools/fd2pragma           8c0f352c348a325
 amiga-netinclude  https://franke.ms/git/bebbo/amiga-netinclude   48b0f9ab4cc6d10b2f5c035d556a2169bdbe6875  projects/amiga-netinclude
 # GFOpenNDK (DalsinAI/gfopensdk): the source of libamiga.a (build.sh step 5b).
 gfopensdk      https://github.com/DalsinAI/gfopensdk        399d1c4ce8c04ef90829e572d1bba69080284eaf  projects/gfopensdk
-# fpuauto: the one-binary soft/hardware-FPU dispatcher, built into Open7.
-amicradle-guest https://github.com/DalsinAI/amicradle-guest.git e62e5c2469e44dbe9f02ebc3523782ef6bbae937 projects/amicradle-guest
+# fpuauto, the one-binary soft/hardware-FPU dispatcher, is carried in
+# runtime/fpuauto (from amicradle-guest e62e5c24, MIT), not fetched.

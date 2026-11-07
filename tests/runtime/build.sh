@@ -4,13 +4,14 @@
 # OUT, for running on a real AmigaOS (see README.md). The C++ program is built
 # with the AC090 profile (-m68040 -m68881); its compile and link must print
 # nothing, and it is linked a second time with --fatal-warnings to prove it.
-# FPUAUTOBENCH_C (amicradle-guest common/fpuauto/FPUAutoBench.c) adds the
-# fpuauto benchmark as auto (soft float, wrapped), plain (-DNO_FPUAUTO) and hard.
+# FPUAUTOBENCH_C (default runtime/fpuauto/FPUAutoBench.c) is the
+# fpuauto benchmark, built as auto (soft float, wrapped), plain (-DNO_FPUAUTO) and hard.
 # Exits 1 if anything fails to build or a check fails.
 # MIT licence, Copyright (c) 2026 AmiCradle Team.
 set -u
-B=$1; O=$2; BENCH=${3:-}
+B=$1; O=$2
 D=$(cd "$(dirname "$0")" && pwd)
+BENCH=${3:-$D/../../runtime/fpuauto/FPUAutoBench.c}
 CC="$B/m68k-amigaos-gcc"; CXX="$B/m68k-amigaos-g++"; NM="$B/m68k-amigaos-nm"
 mkdir -p "$O"; bad=0
 build() {   # build NAME COMPILER FLAGS...: quiet build into $O/NAME, its messages in $O/NAME.log

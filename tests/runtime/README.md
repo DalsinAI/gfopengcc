@@ -6,7 +6,7 @@ them: they need exec tasks, dos.library, the maths libraries and the CPU's
 exception handling.
 
 ```sh
-tests/runtime/build.sh /path/to/prefix/bin OUT [amicradle-guest/common/fpuauto/FPUAutoBench.c]
+tests/runtime/build.sh /path/to/prefix/bin OUT
 ```
 
 builds into `OUT`:
