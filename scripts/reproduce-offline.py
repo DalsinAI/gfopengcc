@@ -61,6 +61,27 @@ def offline():
             raise RuntimeError("offline filter did not block socket creation")
 
 
+def progress(root, text):
+    """Record a progress line; the console copy is best effort.
+
+    A campaign runs for hours. If whoever started it goes away and its
+    stdout pipe closes, printing raises BrokenPipeError. That must not end a
+    build: progress.log in the record keeps every line, and the console copy
+    stops quietly.
+    """
+    line = f"[{time.strftime('%H:%M:%S')}] {text}"
+    with (root / "progress.log").open("a") as log:
+        log.write(line + "\n")
+    if sys.stdout is None:
+        return
+    try:
+        print(line, flush=True)
+    except (BrokenPipeError, OSError):
+        # Point stdout at /dev/null so the interpreter's exit flush cannot
+        # raise a second time.
+        sys.stdout = open(os.devnull, "w")
+
+
 def manifest(root):
     result = {}
     for directory, dirs, files in os.walk(root):
@@ -129,7 +150,7 @@ def main():
         state["stage"] = label
         state["stage_started"] = time.time()
         save()
-        print(f"[{time.strftime('%H:%M:%S')}] {label}: {log}", flush=True)
+        progress(root, f"{label}: {log}")
         env = environment | (extra or {})
         with log.open("w") as output:
             output.write("command: " + json.dumps(list(map(str, args))) + "\n")
@@ -252,7 +273,7 @@ def main():
         (root / "comparison.json").write_text(json.dumps(comparison, indent=2) + "\n")
         state["status"] = "passed" if not differences and comparison["packages_identical"] else "different"
         save()
-        print(f"offline reproducibility: {state['status']}; {root / 'comparison.json'}", flush=True)
+        progress(root, f"offline reproducibility: {state['status']}; {root / 'comparison.json'}")
         return 0 if state["status"] == "passed" else 1
     except BaseException as error:
         state["status"] = "failed"

@@ -60,7 +60,7 @@ def main():
     def run(label, arguments, logfile):
         state["stage"], state["stage_started"] = label, time.time()
         save()
-        print(f"[{time.strftime('%H:%M:%S')}] AROS {label}: {logfile}", flush=True)
+        support.progress(root, f"AROS {label}: {logfile}")
         with logfile.open("w") as output:
             output.write("command: " + json.dumps(list(map(str, arguments))) + "\n")
             output.flush()
@@ -123,7 +123,7 @@ def main():
             state["tool_hashes"][name] = support.sha(prefix / name)
         state["status"], state["finished"] = "passed", time.time()
         save()
-        print(f"AROS clean offline qualification passed: {root}", flush=True)
+        support.progress(root, f"AROS clean offline qualification passed: {root}")
     except BaseException as error:
         state["status"], state["error"] = "failed", str(error)
         save()
