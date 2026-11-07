@@ -135,12 +135,12 @@ done
 # base-relative links, with or without hard float, fall back to an incompatible
 # directory. GFOpenNDK's libamiga.a is replaced by a native per-multilib build
 # in the next step.
-# Each libm040 folder is an exact copy of its libm020 folder, including its
-# libm881 subfolder: libm881 holds only the hard-float members (libnix's libm.a
-# returns doubles in fp0) and the linker finds everything else one level up.
-# Copying the soft-float libm020 files into libm040/libm881 made every
-# -m68040 -m68881 call of sin, exp, log and the other libm routines read a
-# stale fp0, because those soft members return their result in d0/d1.
+# Each libm040 folder gets its libm020 folder's files. Its libm881 subfolder
+# gets the same files with libm020/libm881's hard-float members on top: the
+# hard-float libm.a (and crt0/libc where the framework builds them) must win,
+# because its routines return doubles in fp0. Copying only the soft files
+# there made every -m68040 -m68881 call of sin, exp, log and the other libm
+# routines read a stale fp0 (their soft versions return in d0/d1).
 say "68040 C runtime compatibility directories"
 T=$PREFIX/m68k-amigaos
 for root in "$T/lib" "$T/libnix/lib"; do
@@ -149,20 +149,33 @@ for root in "$T/lib" "$T/libnix/lib"; do
     dst=$root/${rel/libm020/libm040}
     [ -d "$src/libm881" ] || { echo "missing 68020 runtime source directory $src/libm881"; exit 1; }
     rm -rf "$dst"
-    mkdir -p "$dst"
-    cp -a "$src/." "$dst/"
-    diff -r "$src" "$dst" > /dev/null || { echo "68040 runtime seed $dst differs from $src"; exit 1; }
+    mkdir -p "$dst/libm881"
+    find "$src" -maxdepth 1 -type f -exec cp -a {} "$dst/" \;
+    find "$src" -maxdepth 1 -type f -exec cp -a {} "$dst/libm881/" \;
+    cp -a "$src/libm881/." "$dst/libm881/"
+    for f in "$src"/*; do
+      [ ! -f "$f" ] || cmp -s "$f" "$dst/${f##*/}" || { echo "68040 runtime seed: $dst/${f##*/} differs from $f"; exit 1; }
+    done
+    for f in "$src/libm881"/*; do
+      cmp -s "$f" "$dst/libm881/${f##*/}" || { echo "68040 runtime seed: $dst/libm881/${f##*/} is not the hard-float $f"; exit 1; }
+    done
   done
 done
 for f in \
   "$T/lib/libm040/libpthread.a" \
+  "$T/lib/libm040/libm881/libpthread.a" \
   "$T/lib/libb/libm040/libpthread.a" \
+  "$T/lib/libb/libm040/libm881/libpthread.a" \
   "$T/lib/libb32/libm040/libpthread.a" \
+  "$T/lib/libb32/libm040/libm881/libpthread.a" \
   "$T/libnix/lib/libm040/libnix.a" \
+  "$T/libnix/lib/libm040/libm881/libnix.a" \
   "$T/libnix/lib/libm040/libm881/libm.a" \
   "$T/libnix/lib/libb/libm040/libnix.a" \
+  "$T/libnix/lib/libb/libm040/libm881/libnix.a" \
   "$T/libnix/lib/libb/libm040/libm881/libm.a" \
   "$T/libnix/lib/libb32/libm040/libnix.a" \
+  "$T/libnix/lib/libb32/libm040/libm881/libnix.a" \
   "$T/libnix/lib/libb32/libm040/libm881/libm.a"; do
   [ -s "$f" ] || { echo "68040 runtime seed did not produce $f"; exit 1; }
 done

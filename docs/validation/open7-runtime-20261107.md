@@ -75,12 +75,19 @@ On Kickstart 3.2.3 the broken programs happened to print correct results:
 that system's maths library leaves its result in `fp0` as well as `d0`/`d1`.
 On the open Kickstart it does not. The ABI mismatch is a defect either way.
 
-Commit `5ba51d6` makes each `libm040` folder an exact copy of its `libm020`
-folder (whose `libm881` subfolder holds only the hard-float members), and
-the build now fails unless a hard-float `sin` returns in `fp0` for 68020,
+Commit `5ba51d6` seeded each `libm040` folder as an exact copy of its
+`libm020` folder. The first confirmation build (r6) then showed that
+`libm040/libm881` must also hold libnix and libpthread themselves:
+`tests/amigaos-multilib.sh` found `-m68040 -m68881` taking the 68000
+`libpthread.a`. The final seed gives `libm040/libm881` the 68020 files with
+`libm020/libm881`'s hard-float members on top, checks each file against its
+source, and the build now fails unless a hard-float `sin` returns in `fp0` for 68020,
 68040 (plain, `-fbaserel`, `-fbaserel32`) and 68060. Before the fix, 68040
 hard float and both base-relative variants returned in `d0`/`d1`; after it,
-all return in `fp0`, and `-m68040` soft float still (correctly) uses `d0`/`d1`.
+all return in `fp0` and take `libnix.a` from their own `libm040/libm881`
+folder, and `-m68040` soft float still (correctly) uses `d0`/`d1`. Every
+runtime program was rebuilt with the final seed; all are byte-identical to
+the ones that ran (hashes below).
 
 Team 1's matched r2 archives (`0bf5a4d5...`) and the
 `os32-gcc16-16.2.0-open7-candidate` stove on amigachromebuild contain this
