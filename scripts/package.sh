@@ -27,6 +27,11 @@ rsync -a --no-group --exclude '.git' --exclude '/build-*/' --exclude '/download/
   "$WORK/" "$S/$SRC/amiga-gcc/"
 rsync -a --no-group --exclude '.git' --exclude '__pycache__' "$HERE/" "$S/$SRC/gfopengcc/"
 
+# No private AmiCradle repository checkout (amicradle-guest, amicradle-storage)
+# may go into a public release.
+bad=$(cd "$S" && find . \( -iname 'amicradle-guest*' -o -iname 'amicradle-storage*' -o -name 'AMIGACHROME_GUEST_PINNED_COMMIT' \) -print | head -5)
+[ -z "$bad" ] || { echo "private AmiCradle sources in the release: $bad"; exit 1; }
+
 # Nothing of the NDK, and every libamiga.a GFOpenNDK's.
 bad=$(cd "$S" && find . \( -path '*/projects/NDK3.2*' -o -name 'NDK3.2.lha' -o -iname 'amiga.lib' -o -name 'ndk-include' -o -name 'ndk13-include' \) -print | head -5)
 [ -z "$bad" ] || { echo "NDK files in the release: $bad"; exit 1; }
