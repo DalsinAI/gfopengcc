@@ -1,0 +1,123 @@
+From f108ca04b6c2630420942e782962e3badfccf90f Mon Sep 17 00:00:00 2001
+From: SacredTrees <121399723+SacredTrees@users.noreply.github.com>
+Date: Tue, 10 Nov 2026 18:03:37 +0000
+Subject: [PATCH] socket: ioctl() takes POSIX's three arguments; fcntl() for
+ sockets
+
+ioctl() took ixemul's five-argument form, ioctl(fd, cmd, inout, arglen,
+data). Called as POSIX has it, ioctl(fd, FIONBIO, &on) (Boost.Asio, aMule
+and every port), it handed the stack whatever lay two words after &on as
+the argument: EFAULT when that was 0 (Team 2's udptest, 10 Nov 2026), a
+write through a stray pointer for FIONREAD when it wasn't. It reads one
+argument now. A descriptor that isn't open is EBADF (before, a NULL
+dereference); a file or console is ENOTTY (before, EBADF).
+
+libnix's fcntl() returns -1 for everything and leaves errno. The socket
+library, which comes before libnix, has one of its own now: F_GETFD gives
+0 and F_SETFD is taken (no exec); F_SETFL sets or clears O_NONBLOCK on a
+socket through FIONBIO and refuses it for a file (EINVAL); F_GETFL gives
+O_RDWR (the stack has no call that reports FIONBIO); other commands EINVAL;
+a descriptor that isn't open EBADF.
+---
+ sources/socket/socket/fcntl.c | 57 +++++++++++++++++++++++++++++++++++
+ sources/socket/socket/ioctl.c | 13 +++++---
+ 2 files changed, 66 insertions(+), 4 deletions(-)
+ create mode 100644 sources/socket/socket/fcntl.c
+
+diff --git a/sources/socket/socket/fcntl.c b/sources/socket/socket/fcntl.c
+new file mode 100644
+index 0000000..1f0d8ce
+--- /dev/null
++++ b/sources/socket/socket/fcntl.c
+@@ -0,0 +1,57 @@
++#include "stdio.h"
++#include <errno.h>
++#include <fcntl.h>
++#include <stdarg.h>
++#include <sys/types.h>
++#include <sys/socket.h>
++#include <sys/ioctl.h>
++//
++#include "socket.h"
++
++/* fcntl() for programs linked with the socket library, which comes before
++ * libnix (libnix's own fcntl() returns -1 for everything and leaves errno).
++ *   F_GETFD gives 0 and F_SETFD is taken: there is no exec, so
++ *   close-on-exec has nothing to do.
++ *   F_SETFL sets or clears O_NONBLOCK on a socket through FIONBIO; a file
++ *   can't be made non-blocking (EINVAL). F_GETFL gives O_RDWR: the stack
++ *   has no call that reports FIONBIO.
++ *   Other commands EINVAL; a descriptor that isn't open EBADF. */
++__stdargs int fcntl(int fd, int cmd, ...)
++{ struct SocketSettings *lss;
++  StdFileDes *fp = _lx_fhfromfd(fd);
++  long arg, on;
++  va_list va;
++
++  if (fp == NULL) {
++    errno = EBADF; return -1;
++  }
++  va_start(va, cmd);
++  arg = va_arg(va, long);
++  va_end(va);
++
++  switch (cmd) {
++    case F_GETFD:
++    case F_SETFD:
++      return 0;
++    case F_GETFL:
++      return O_RDWR;
++    case F_SETFL:
++      if (!(fp->lx_flags & LX_SOCKET)) {
++        if (arg & O_NONBLOCK) {
++          errno = EINVAL; return -1;
++        }
++        return 0;
++      }
++      on = (arg & O_NONBLOCK) ? 1 : 0;
++      switch (lss=_lx_get_socket_settings(),lss->lx_network_type) {
++        case LX_AS225:
++          return SOCK_ioctl(fp->lx_sock, ('m'<<8)|22, (caddr_t)&on);
++        case LX_AMITCP:
++          return TCP_IoctlSocket(fp->lx_sock, FIONBIO, (char *)&on);
++        default:
++          errno = ENOSYS; return -1;
++      }
++    default:
++      errno = EINVAL; return -1;
++  }
++}
+diff --git a/sources/socket/socket/ioctl.c b/sources/socket/socket/ioctl.c
+index e993e1b..9528c01 100644
+--- a/sources/socket/socket/ioctl.c
++++ b/sources/socket/socket/ioctl.c
+@@ -12,17 +12,22 @@
+ __stdargs int ioctl(int s, unsigned long cmd, ...)
+ { struct SocketSettings *lss;
+   StdFileDes *fp = _lx_fhfromfd(s);
+-  int arglen,inout,rc;
++  int rc;
+   caddr_t data;
+   va_list va;
+ 
+-  if (fp->lx_flags & LX_FILE) {
++  if (fp == NULL) {
+     errno = EBADF; return -1;
+   }
++  if (!(fp->lx_flags & LX_SOCKET)) {
++    errno = ENOTTY; return -1;
++  }
+   
++  /* POSIX: ioctl(fd, cmd, arg). This took ixemul's five-argument form
++   * (inout, arglen, data), so ioctl(fd, FIONBIO, &on) handed the stack
++   * whatever lay two words after &on as the argument: EFAULT when that
++   * was 0, a write through a stray pointer for FIONREAD when it wasn't. */
+   va_start(va, cmd);
+-  inout = va_arg(va, int);
+-  arglen = va_arg(va, int);
+   data = va_arg(va, caddr_t);
+   va_end(va);
+ 
+-- 
+2.53.0
+
