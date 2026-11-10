@@ -115,10 +115,21 @@ done
 T="$ROOT/tests/pthreads/exitcancel.c"
 CF="-noixemul -m68040 -O2"
 EXTRA_CF=""; for i in ${EXTRA_INC:-}; do EXTRA_CF="$EXTRA_CF -isystem $i"; done
+# the archive a plain -lpthread link opens: gcc 6.5 (os32) prints "." for
+# -m68040 but links from libm020 (its -fl libm020), so ask the linker itself
+echo 'int main(void){return 0;}' > "$OUT/obj/t.c"
 # shellcheck disable=SC2086
-MD=$("$CC" $CF -print-multi-directory); NEWLIB="$OUT/lib/$MD/libpthread.a"
+USED=$("$CC" $CF $EXTRA_CF -Wl,--verbose -o "$OUT/obj/t" "$OUT/obj/t.c" -lpthread 2>/dev/null \
+  | sed -n 's/^attempt to open \(.*\/libpthread\.a\) succeeded$/\1/p' | head -1)
+# the linker names it through gcc's own folder (.../lib/gcc/m68k-amigaos/<v>/../../../..)
+[ -z "$USED" ] || USED=$(readlink -f "$USED"); LIB=$(readlink -f "$LIB")
+case "$USED" in
+  "$LIB"/*) MD=$(dirname "${USED#"$LIB"/}") ;;
+  *) echo "a plain -lpthread link takes ${USED:-no libpthread.a}, not one in $LIB; stopping" >&2; exit 1 ;;
+esac
+NEWLIB="$OUT/lib/$MD/libpthread.a"
 [ -f "$NEWLIB" ] || NEWLIB="$LIB/$MD/libpthread.a"   # the stove already has it
-echo "test multilib: $MD"
+echo "test multilib: $MD (the one a plain -lpthread link uses)"
 # shellcheck disable=SC2086
 "$CC" $CF $EXTRA_CF -o "$OUT/tests/ExitCancel" "$T" "$NEWLIB"
 # shellcheck disable=SC2086
