@@ -51,6 +51,10 @@ echo "patch: $(basename "$PATCH")"
 # Makefile.gcc6: CFLAGS_FOR_TARGET (scripts/build.sh) + -I headers -fno-builtin
 # -ffast-math -D__libnix__, -noixemul for the socket library, + the multilib's flags
 BASE="-O2 -fomit-frame-pointer -fno-tree-loop-distribute-patterns -I$HDR -fno-builtin -ffast-math -D__libnix__ -noixemul"
+# libnix was built before the toolchain's sys-include wrappers (gfopengcc's
+# sys-include/utmp.h includes <sys/utmp.h>, which the stove doesn't have), so
+# the target include folder comes first, as it did then
+BASE="$BASE -isystem $P/m68k-amigaos/include"
 # a stove has the NDK and network headers in its own search path; a bare
 # toolchain (the release archive) needs them named: EXTRA_INC="dir dir"
 for i in ${EXTRA_INC:-}; do BASE="$BASE -isystem $i"; done
