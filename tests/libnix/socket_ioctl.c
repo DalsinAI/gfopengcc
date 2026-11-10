@@ -27,7 +27,7 @@ static void check(const char *what, int ok, int r)
 int main(void)
 {
     struct sockaddr_in a;
-    struct timeval tv = { 1, 0 };
+    struct timeval tv;
     char buf[8];
     int s = socket(AF_INET, SOCK_DGRAM, 0), on = 1, off = 0, n = -1, r;
     check("socket", s >= 0, s);
@@ -37,6 +37,8 @@ int main(void)
     a.sin_port = htons(23481);
     a.sin_addr.s_addr = htonl(0x7f000001UL);
     bind(s, (struct sockaddr *)&a, sizeof a);
+    tv.tv_sec = 1;
+    tv.tv_usec = 0;
     setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof tv);   /* no hang if FIONBIO fails */
     errno = 0; r = ioctl(s, FIONBIO, &on);
     check("ioctl FIONBIO on", r == 0, r);
