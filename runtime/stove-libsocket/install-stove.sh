@@ -40,7 +40,7 @@ one() {
   ok=1
   CF="-noixemul -m68040 -O2 -fno-delete-null-pointer-checks"
   # shellcheck disable=SC2086
-  for i in ${EXTRA_INC:-}; do CF="$CF -isystem $i"; done
+  for i in ${EXTRA_INC:-} $(cat "$T/b/extra-inc" 2>/dev/null); do CF="$CF -isystem $i"; done   # with any build-amiga.sh found
   # shellcheck disable=SC2086
   "$CC" $CF -o "$T/after" "$HERE/../../tests/libnix/socket_ioctl.c" -lsocket > "$T/after.log" 2>&1 || { ok=0; tail -5 "$T/after.log"; }
   if [ $ok = 1 ]; then

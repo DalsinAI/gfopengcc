@@ -23,7 +23,7 @@ CC="$P/bin/m68k-amigaos-gcc"; AR="$P/bin/m68k-amigaos-ar"; NM="$P/bin/m68k-amiga
 [ -x "$CC" ] || { echo "build-amiga.sh: no $CC" >&2; exit 2; }
 LIB="$P/m68k-amigaos/libnix/lib"; HDR="$P/m68k-amigaos/libnix/include"
 echo "built on $(hostname) as $(id -un), stove $STOVE ($("$CC" --version | head -1))"
-OUT=${OUT:-"$HERE/build-amiga"}; rm -rf "$OUT/lib" "$OUT/obj"; mkdir -p "$OUT/lib" "$OUT/tests" "$OUT/obj"
+OUT=${OUT:-"$HERE/build-amiga"}; rm -rf "$OUT/lib" "$OUT/obj" "$OUT/extra-inc"; mkdir -p "$OUT/lib" "$OUT/tests" "$OUT/obj"
 PATCH=$(ls "$ROOT"/patches/libnix/0010-*.patch)
 
 # libnix's socket sources at the commit the stove was built from
@@ -58,6 +58,21 @@ BASE="$BASE -isystem $P/m68k-amigaos/include"
 # a stove has the NDK and network headers in its own search path; a bare
 # toolchain (the release archive) needs them named: EXTRA_INC="dir dir"
 for i in ${EXTRA_INC:-}; do BASE="$BASE -isystem $i"; done
+# some stoves (os32-gcc16 on amigachromebuild) keep the network headers that
+# their include/sys/socket.h needs (sys/netinclude_types.h) in a folder of
+# their own: when <sys/socket.h> does not preprocess, that folder is found in
+# the stove and named, as EXTRA_INC would
+socket_h() { echo '#include <sys/socket.h>' | "$CC" -E $BASE -x c - >/dev/null 2>&1; }
+# shellcheck disable=SC2086
+if ! socket_h; then
+  for h in $(find "$P" -path '*/sys/netinclude_types.h' 2>/dev/null | sort); do
+    i=${h%/sys/netinclude_types.h}; BASE="$BASE -isystem $i"
+    # shellcheck disable=SC2086
+    if socket_h; then EXTRA_INC="${EXTRA_INC:-} $i"; echo "$i" >> "$OUT/extra-inc"; echo "network headers: $i (found in the stove)"; break; fi
+    BASE=${BASE% -isystem $i}
+  done
+  socket_h || { echo "<sys/socket.h> does not preprocess with this stove; name its network headers with EXTRA_INC" >&2; exit 1; }
+fi
 n=0
 for v in ".:" "libb:-fbaserel" "libm020:-m68020" "libb/libm020:-fbaserel -m68020" "libb32/libm020:-fbaserel32 -m68020"; do
   d=${v%%:*}; f=${v#*:}
@@ -83,10 +98,11 @@ for v in ".:" "libb:-fbaserel" "libm020:-m68020" "libb/libm020:-fbaserel -m68020
   n=$((n+1))
 done
 [ $n -gt 0 ] || { echo "no libsocket.a in $LIB" >&2; exit 1; }
-# a stove from scripts/build.sh's 68040 seed has libm040 folders holding
-# copies of their libm020 folders' files: they get the same new copy
-for d in libm040 libb/libm040 libb32/libm040; do
-  s=${d%libm040}libm020
+# a stove from scripts/build.sh's 68040 seed has libm040 folders, and (open7
+# on) libm040/libm881 folders, holding copies of their libm020 folders' files
+# (libm020/libm881 has no libsocket.a): they get the same new copy
+for d in libm040 libb/libm040 libb32/libm040 libm040/libm881 libb/libm040/libm881 libb32/libm040/libm881; do
+  s=${d%/libm881}; s=${s%libm040}libm020   # libm881 folders get the libm020 folder's soft files too
   [ -f "$LIB/$d/libsocket.a" ] || continue
   if "$AR" t "$LIB/$d/libsocket.a" | grep -qx fcntl.o; then echo "$d: already has fcntl.o (patch 0010), left alone"; continue; fi
   [ -f "$OUT/lib/$s/libsocket.a" ] && cmp -s "$LIB/$d/libsocket.a" "$LIB/$s/libsocket.a" \
@@ -97,6 +113,7 @@ done
 # any libsocket.a in the stove this script doesn't know is a reason to stop
 for f in $(cd "$LIB" && find . -name libsocket.a | sed 's|^\./||'); do
   case "$f" in libsocket.a|libb/libsocket.a|libm020/libsocket.a|libb/libm020/libsocket.a|libb32/libm020/libsocket.a|libm040/libsocket.a|libb/libm040/libsocket.a|libb32/libm040/libsocket.a) ;;
+    libm040/libm881/libsocket.a|libb/libm040/libm881/libsocket.a|libb32/libm040/libm881/libsocket.a) ;;
     *) echo "$f: a libsocket.a this script doesn't know; stopping" >&2; exit 1 ;; esac
 done
 
@@ -105,10 +122,22 @@ done
 T="$ROOT/tests/libnix/socket_ioctl.c"
 CF="-noixemul -m68040 -O2 -fno-delete-null-pointer-checks"
 EXTRA_CF=""; for i in ${EXTRA_INC:-}; do EXTRA_CF="$EXTRA_CF -isystem $i"; done
+# the archive a plain -lsocket link opens: gcc 6.5 (os32) prints "." for
+# -m68040 but links from libm020 (its -fl libm020), so ask the linker itself
+echo 'int main(void){return 0;}' > "$OUT/obj/t.c"
 # shellcheck disable=SC2086
-MD=$("$CC" $CF -print-multi-directory); NEWLIB="$OUT/lib/$MD/libsocket.a"
+USED=$("$CC" $CF $EXTRA_CF -Wl,--verbose -o "$OUT/obj/t" "$OUT/obj/t.c" -lsocket 2>/dev/null \
+  | sed -n 's/^attempt to open \(.*\/libsocket\.a\) succeeded$/\1/p' | head -1)
+# gcc 16's trace names it through its own folder (lib/gcc/m68k-amigaos/<v>/../../../../...):
+# both sides are resolved before they are compared
+[ -z "$USED" ] || USED=$(readlink -f "$USED"); RLIB=$(readlink -f "$LIB")
+case "$USED" in
+  "$RLIB"/*) MD=$(dirname "${USED#"$RLIB"/}") ;;
+  *) echo "a plain -lsocket link takes ${USED:-no libsocket.a}, not one in $LIB; stopping" >&2; exit 1 ;;
+esac
+NEWLIB="$OUT/lib/$MD/libsocket.a"
 [ -f "$NEWLIB" ] || NEWLIB="$LIB/$MD/libsocket.a"   # the stove already has it
-echo "test multilib: $MD"
+echo "test multilib: $MD (the one a plain -lsocket link uses)"
 # shellcheck disable=SC2086
 "$CC" $CF $EXTRA_CF -o "$OUT/tests/SocketIoctl" "$T" "$NEWLIB"
 # shellcheck disable=SC2086
