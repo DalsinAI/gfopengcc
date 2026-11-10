@@ -17,6 +17,7 @@ git am /path/to/patches/libnix/*.patch      # or: patch -p1 < each file, in orde
 | `0007-cxxglue-__initcpp-…` | under `-fbaserel`/`-fbaserel32`, `__init_eh` and `__initcpp` addressed the `.list` sections (in the code hunk) from a4: `-fbaserel` C++ failed to link and `-fbaserel32` C++ hung before `main` | `tests/baserel/FINDINGS.md` |
 | `0008-strtol-strtoul-…` | empty-input conversion leaves `endptr` untouched; `strtol` also consumes an uninitialised end pointer after whitespace-only input | `docs/libnix-strtol-endptr.md`; native original/fixed control in `tests/libnix/strtol_endptr.c` |
 | `0009-libnix4-exclude-…` | `libnix4.library` exports and links `__vfwprintf_total_size` twice because `preplib` excludes a misspelled object name | `tests/libnix4-source-list.sh`; the `FULL_SPECIFIERS` math copy is retained, as for `__vfprintf_total_size` |
+| `0010-socket-ioctl-…` | `ioctl()` in the socket library took ixemul's five-argument form, so POSIX's `ioctl(fd, FIONBIO, &on)` (Boost.Asio, aMule) passed a stray stack word as the argument: EFAULT, or a stray write for FIONREAD; libnix's `fcntl()` returned -1 for everything with errno untouched | `docs/libnix-socket-ioctl.md`; `tests/libnix/socket_ioctl.c` |
 
 Then rebuild libnix (`make libnix` in amiga-gcc, or `Makefile.gcc6 all install`). Built with the GCC 16.2 stove at `-O2`, the unpatched source gives a `libnix20.a`, `libnix13.a` and start code byte-identical to the stove's.
 
