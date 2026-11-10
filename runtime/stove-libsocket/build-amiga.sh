@@ -128,8 +128,11 @@ echo 'int main(void){return 0;}' > "$OUT/obj/t.c"
 # shellcheck disable=SC2086
 USED=$("$CC" $CF $EXTRA_CF -Wl,--verbose -o "$OUT/obj/t" "$OUT/obj/t.c" -lsocket 2>/dev/null \
   | sed -n 's/^attempt to open \(.*\/libsocket\.a\) succeeded$/\1/p' | head -1)
+# gcc 16's trace names it through its own folder (lib/gcc/m68k-amigaos/<v>/../../../../...):
+# both sides are resolved before they are compared
+[ -z "$USED" ] || USED=$(readlink -f "$USED"); RLIB=$(readlink -f "$LIB")
 case "$USED" in
-  "$LIB"/*) MD=$(dirname "${USED#"$LIB"/}") ;;
+  "$RLIB"/*) MD=$(dirname "${USED#"$RLIB"/}") ;;
   *) echo "a plain -lsocket link takes ${USED:-no libsocket.a}, not one in $LIB; stopping" >&2; exit 1 ;;
 esac
 NEWLIB="$OUT/lib/$MD/libsocket.a"
