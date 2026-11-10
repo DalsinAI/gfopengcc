@@ -22,3 +22,8 @@ rebuilt from the patched source, `fcntl.o` added).
 libnix's sources come from `scripts/sources.lock`, or the open6 release's
 source archive when that host can't be reached. A bare toolchain (the release
 archive, not a stove) needs `EXTRA_INC` naming the NDK and network headers.
+A stove whose `<sys/socket.h>` needs network headers kept in a folder of their
+own (`sys/netinclude_types.h`, as amigachromebuild's os32-gcc16 stoves have
+them) has that folder found in the stove and used, as `EXTRA_INC` would.
+The 68040 copies (`libm040`, and from open7 `libm040/libm881`) get the new
+copy of their `libm020` folder's archive; any other `libsocket.a` stops it.
