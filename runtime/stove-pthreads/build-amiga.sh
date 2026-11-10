@@ -56,8 +56,17 @@ mkdir -p "$OUT/obj/new"; cp -R "$SRC/pthreads" "$OUT/obj/new/"
 ( cd "$OUT/obj/new" && patch -s -p1 < "$NEWP" )
 echo "patch: $(basename "$NEWP")"
 
-# libpthread's Makefile: -noixemul, the pthreads folder, the NDK; no -O
-BASE="-noixemul -isystem $P/m68k-amigaos/ndk-include.vendor"
+# libpthread's Makefile: -noixemul, the pthreads folder, the NDK; no -O.
+# The NDK is the folder holding inline/alib.h: ndk-include.vendor on open6,
+# found by name on a stove that keeps it elsewhere
+NDK="$P/m68k-amigaos/ndk-include.vendor"
+if [ ! -f "$NDK/inline/alib.h" ]; then
+  a=$(find "$P/m68k-amigaos" -path '*/inline/alib.h' 2>/dev/null | sort | head -1)
+  [ -n "$a" ] || { echo "no inline/alib.h in the stove: name the NDK with EXTRA_INC" >&2; [ -n "${EXTRA_INC:-}" ] || exit 1; }
+  [ -n "$a" ] && NDK=$(dirname "$(dirname "$a")")
+fi
+echo "NDK headers: $NDK"
+BASE="-noixemul -isystem $NDK"
 # a bare toolchain (the release archive) names its NDK: EXTRA_INC="dir dir"
 for i in ${EXTRA_INC:-}; do BASE="$BASE -isystem $i"; done
 n=0
