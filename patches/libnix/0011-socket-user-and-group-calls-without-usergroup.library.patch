@@ -1,0 +1,295 @@
+From c643e236ccf6f36bbfd9db03eec7e530b220a266 Mon Sep 17 00:00:00 2001
+From: SacredTrees <121399723+SacredTrees@users.noreply.github.com>
+Date: Wed, 11 Nov 2026 02:00:00 +0000
+Subject: [PATCH] socket: user and group calls without usergroup.library
+
+With bsdsocket.library open the socket library runs in AmiTCP mode, and
+its user and group calls went to usergroup.library through
+lx_UserGroupBase. A stack with no usergroup.library (GFOpenSocket, or
+Roadshow without it) leaves that base NULL, and a call through it never
+came back: wxWidgets' tar reader calls getgrgid() for every archive,
+which hung 4Pane on opening a .tar.gz (Team 2, 11 Nov 2026). Only
+getpwuid() checked the base, and it returned NULL.
+
+Without usergroup.library the calls now answer as with no network: the
+built-in groups (wheel, nogroup, $GROUP for getgid()'s) and users
+(root, nobody, getlogin()'s), with no group or passwd file looked for.
+getgroups(), setgroups() and crypt() check the base too.
+---
+ sources/socket/unistd/__inituser.c |  5 ++--
+ sources/socket/unistd/crypt.c      |  3 ++-
+ sources/socket/unistd/getgrent.c   | 35 ++++++++++++++++---------
+ sources/socket/unistd/getpwent.c   | 41 ++++++++++++++++++++++--------
+ 4 files changed, 58 insertions(+), 26 deletions(-)
+
+diff --git a/sources/socket/unistd/__inituser.c b/sources/socket/unistd/__inituser.c
+index 373b342..e06ed5e 100644
+--- a/sources/socket/unistd/__inituser.c
++++ b/sources/socket/unistd/__inituser.c
+@@ -100,7 +100,8 @@ int setlogin(const char *name)
+ int getgroups(int gidsetlen, gid_t *gidset)
+ { struct SocketSettings *lss = _lx_get_socket_settings();
+ 
+-  if (lss->lx_network_type == LX_AMITCP)
++  /* no usergroup.library: the list kept here (patch 0011) */
++  if (lss->lx_network_type == LX_AMITCP && lss->lx_UserGroupBase)
+     return UG_getgroups(gidsetlen, (int*)gidset);
+ 
+   /* parameter check */
+@@ -123,7 +124,7 @@ int getgroups(int gidsetlen, gid_t *gidset)
+ int setgroups(int gidsetlen, const gid_t *gidset)
+ { struct SocketSettings *lss = _lx_get_socket_settings();
+ 
+-  if (lss->lx_network_type == LX_AMITCP)
++  if (lss->lx_network_type == LX_AMITCP && lss->lx_UserGroupBase)
+     return UG_setgroups(gidsetlen,(int*)gidset);
+ 
+   /* parameter check */
+diff --git a/sources/socket/unistd/crypt.c b/sources/socket/unistd/crypt.c
+index 949bd17..dfcb1e0 100644
+--- a/sources/socket/unistd/crypt.c
++++ b/sources/socket/unistd/crypt.c
+@@ -5,7 +5,8 @@
+ char *crypt(const char *key, const char *setting)
+ { struct SocketSettings *lss = _lx_get_socket_settings();
+ 
+-  if (lss->lx_network_type == LX_AMITCP)
++  /* no usergroup.library: nothing to call (patch 0011) */
++  if (lss->lx_network_type == LX_AMITCP && lss->lx_UserGroupBase)
+     return UG_crypt(key,setting);
+   return NULL;
+ }
+diff --git a/sources/socket/unistd/getgrent.c b/sources/socket/unistd/getgrent.c
+index e9ade2b..9bfd8fa 100644
+--- a/sources/socket/unistd/getgrent.c
++++ b/sources/socket/unistd/getgrent.c
+@@ -17,6 +17,17 @@ struct group* getgrnam(const char *name);
+ 
+ static gid_t nextgid;
+ 
++/*
++ ** AmiTCP's group calls go through usergroup.library. A bsdsocket.library
++ ** with no usergroup.library (GFOpenSocket, Roadshow without it) leaves
++ ** lx_UserGroupBase NULL, and a call through it never came back. Without it
++ ** the calls answer as with no network: the built-in groups, and $GROUP
++ ** for getgid()'s group (no group file is looked for: inet: isn't there).
++ */
++#define UG_OK(lss)      ((lss)->lx_network_type == LX_AMITCP && (lss)->lx_UserGroupBase)
++#define UG_MISSING(lss) ((lss)->lx_network_type == LX_AMITCP && !(lss)->lx_UserGroupBase)
++#define BUILTIN(lss)    ((lss)->lx_network_type == LX_NONE || UG_MISSING(lss))
++
+ /*
+  ** builtin group info
+  */
+@@ -103,11 +114,11 @@ static int gr_scan(int search, gid_t gid, const char *name, struct SocketSetting
+ int setgroupent(int stayopen) {
+ 	struct SocketSettings *lss = _lx_get_socket_settings();
+ 
+-	if (lss->lx_network_type == LX_AMITCP) {
++	if (UG_OK(lss)) {
+ 		UG_setgrent();
+ 	} else {
+ 		nextgid = 0;
+-		if (gr_start(lss))
++		if (!UG_MISSING(lss) && gr_start(lss))
+ 			lss->lx_grp_stayopen = stayopen;
+ 	}
+ 
+@@ -121,7 +132,7 @@ void setgrent(void) {
+ void endgrent(void) {
+ 	struct SocketSettings *lss = _lx_get_socket_settings();
+ 
+-	if (lss->lx_network_type == LX_AMITCP) {
++	if (UG_OK(lss)) {
+ 		UG_endgrent();
+ 	} else {
+ 		nextgid = 0;
+@@ -135,11 +146,11 @@ void endgrent(void) {
+ struct group* getgrent(void) {
+ 	struct SocketSettings *lss = _lx_get_socket_settings();
+ 
+-	if (lss->lx_network_type == LX_AMITCP) {
++	if (UG_OK(lss)) {
+ 		return UG_getgrent();
+-	} else if ((lss->lx_grp_fp || gr_start(lss)) && gr_scan(0, 0, NULL, lss)) {
++	} else if (!UG_MISSING(lss) && (lss->lx_grp_fp || gr_start(lss)) && gr_scan(0, 0, NULL, lss)) {
+ 		return &lss->lx_grp;
+-	} else if (lss->lx_network_type == LX_NONE) {
++	} else if (BUILTIN(lss)) {
+ 		char *name;
+ 		switch (nextgid) {
+ 		case 0:
+@@ -170,17 +181,17 @@ struct group* getgrgid(gid_t gid) {
+ 
+ 	lss = _lx_get_socket_settings();
+ 
+-	if (lss->lx_network_type == LX_AMITCP) {
++	if (UG_OK(lss)) {
+ 		struct group *grp = UG_getgrgid(gid);
+ 		if (!grp)
+ 			errno = ug_GetErr();
+ 		return grp;
+-	} else if (gr_start(lss)) {
++	} else if (!UG_MISSING(lss) && gr_start(lss)) {
+ 		int rval = gr_scan(1, gid, NULL, lss);
+ 		if (!lss->lx_grp_stayopen)
+ 			endgrent();
+ 		return (rval ? &lss->lx_grp : NULL);
+-	} else if (lss->lx_network_type == LX_NONE) {
++	} else if (BUILTIN(lss)) {
+ 		if (gid == 0)
+ 			return (struct group*) &builtin_wheel;
+ 		if ((gid == getgid()) && (lss->lx_grp.gr_name = getenv("GROUP"))) {
+@@ -202,17 +213,17 @@ struct group* getgrnam(const char *name) {
+ 
+ 	lss = _lx_get_socket_settings();
+ 
+-	if (lss->lx_network_type == LX_AMITCP) {
++	if (UG_OK(lss)) {
+ 		struct group *grp = UG_getgrnam(name);
+ 		if (!grp)
+ 			errno = ug_GetErr();
+ 		return grp;
+-	} else if (gr_start(lss)) {
++	} else if (!UG_MISSING(lss) && gr_start(lss)) {
+ 		int rval = gr_scan(1, 0, name, lss);
+ 		if (!lss->lx_grp_stayopen)
+ 			endgrent();
+ 		return (rval ? &lss->lx_grp : NULL);
+-	} else if (lss->lx_network_type == LX_NONE) {
++	} else if (BUILTIN(lss)) {
+ 		if (!strcmp(name, "wheel"))
+ 			return (struct group*) &builtin_wheel;
+ 		if ((lss->lx_grp.gr_name = getenv("GROUP")) && !strcmp(lss->lx_grp.gr_name, name)) {
+diff --git a/sources/socket/unistd/getpwent.c b/sources/socket/unistd/getpwent.c
+index b1a4c48..3cd9ab9 100644
+--- a/sources/socket/unistd/getpwent.c
++++ b/sources/socket/unistd/getpwent.c
+@@ -18,6 +18,20 @@ struct passwd *getpwnam(const char *name);
+ 
+ static uid_t nextuid;
+ 
++/*
++** AmiTCP's user calls go through usergroup.library; with no
++** usergroup.library (lx_UserGroupBase NULL) a call through it never came
++** back. Without it they answer as with no network, from getlogin() and the
++** built-in users, and no passwd file is looked for (etc: isn't there).
++*/
++#define LX_NOUSERGROUP (-1)
++static int net_type(struct SocketSettings *lss)
++{
++  if (lss->lx_network_type == LX_AMITCP && !lss->lx_UserGroupBase)
++    return LX_NOUSERGROUP;
++  return lss->lx_network_type;
++}
++
+ /*
+ ** builtin passwd info
+ */
+@@ -150,7 +164,9 @@ static struct passwd *__TCP2InetPwd(struct TCP_passwd *pwd,struct SocketSettings
+ int setpassent(int stayopen)
+ { struct SocketSettings *lss;
+ 
+-  switch (lss=_lx_get_socket_settings(),lss->lx_network_type) {
++  int t;
++
++  switch (lss=_lx_get_socket_settings(),t=net_type(lss)) {
+     case LX_AS225:
+       SOCK_setpwent(stayopen);
+     break;
+@@ -161,7 +177,7 @@ int setpassent(int stayopen)
+ 
+     default:
+ 	  nextuid=0;
+-      if (pw_start(lss))
++      if (t != LX_NOUSERGROUP && pw_start(lss))
+         lss->lx_pwd_stayopen = stayopen;
+     break;
+   }
+@@ -177,7 +193,7 @@ int setpwent(void)
+ void endpwent(void)
+ { struct SocketSettings *lss;
+ 
+-  switch (lss=_lx_get_socket_settings(),lss->lx_network_type) {
++  switch (lss=_lx_get_socket_settings(),net_type(lss)) {
+     case LX_AS225:
+       SOCK_endpwent();
+     break;
+@@ -199,8 +215,9 @@ struct passwd *getpwent(void)
+ { struct SocketSettings *lss = _lx_get_socket_settings();
+   struct passwd *pwd;
+   char *name;
++  int t;
+ 
+-  switch (lss=_lx_get_socket_settings(),lss->lx_network_type) {
++  switch (lss=_lx_get_socket_settings(),t=net_type(lss)) {
+     case LX_AS225:
+       return __AS225InetPwd(SOCK_getpwent(),lss);
+     break;
+@@ -212,7 +229,7 @@ struct passwd *getpwent(void)
+     break;
+ 
+     default:
+-      if ((lss->lx_pwd_fp || pw_start(lss)) && pw_scan(0, 0, NULL, lss))
++      if (t != LX_NOUSERGROUP && (lss->lx_pwd_fp || pw_start(lss)) && pw_scan(0, 0, NULL, lss))
+         return &lss->lx_pwd;
+       switch (nextuid) {
+         case 0:
+@@ -237,10 +254,12 @@ struct passwd *getpwuid(uid_t uid)
+ { struct SocketSettings *lss;
+   struct passwd *pwd;
+ 
++  int t;
++
+   if (uid == (uid_t)(-2))
+     return (struct passwd *)&builtin_nobody; /* always handle nobody */
+ 
+-  switch (lss=_lx_get_socket_settings(),lss->lx_network_type) {
++  switch (lss=_lx_get_socket_settings(),t=net_type(lss)) {
+     case LX_AS225:
+       return __AS225InetPwd(SOCK_getpwuid(uid),lss);
+     break;
+@@ -249,8 +268,6 @@ struct passwd *getpwuid(uid_t uid)
+       /* Don't do this if uid == -2 (nobody2) */
+       /* This happens when someone doesn't use AmiTCP's login */
+       if (uid != (uid_t)-2) {
+-    	  if (!USERGROUP_BASE_NAME)
+-    		  return 0;
+         if ((pwd=__TCP2InetPwd(UG_getpwuid(uid),lss)) == NULL)
+           errno = ug_GetErr();
+         return pwd;
+@@ -261,7 +278,7 @@ struct passwd *getpwuid(uid_t uid)
+     break;
+ 
+     default:
+-      if (pw_start(lss))  {
++      if (t != LX_NOUSERGROUP && pw_start(lss))  {
+         int rval = pw_scan(1, uid, NULL, lss);
+         if (!lss->lx_pwd_stayopen)
+           endpwent();
+@@ -290,10 +307,12 @@ struct passwd *getpwnam(const char *name)
+ { struct SocketSettings *lss;
+   struct passwd *pwd;
+ 
++  int t;
++
+   if (!strcmp(name,"nobody"))
+     return (struct passwd *)&builtin_nobody;
+ 
+-  switch (lss=_lx_get_socket_settings(),lss->lx_network_type) {
++  switch (lss=_lx_get_socket_settings(),t=net_type(lss)) {
+     case LX_AS225:
+       return __AS225InetPwd(SOCK_getpwnam((char *)name),lss);
+     break;
+@@ -305,7 +324,7 @@ struct passwd *getpwnam(const char *name)
+     break;
+ 
+     default:
+-      if (pw_start(lss)) {
++      if (t != LX_NOUSERGROUP && pw_start(lss)) {
+         int rval = pw_scan(1, 0, name, lss);
+         if (!lss->lx_pwd_stayopen)
+           endpwent();
+-- 
+2.53.0
+
