@@ -46,3 +46,17 @@ With the stove's library (0001-0007) each child's block came out of low memory (
 ```bash
 m68k-amigaos-gcc -m68040 -O2 -noixemul -o foreigntls foreigntls.c -lpthread
 ```
+
+`exitcancel.c` (`patches/aros-stuff/0010`): threads still running when `main` returns. Each case is one run; time it from the Shell:
+- `exitcancel cond`: a worker waits in `pthread_cond_wait` for ever. The program must be back at the Shell at once, with no clean-up handler line and no `T:pthreads-exit.log`.
+- `exitcancel sem`: the same with `sem_wait`.
+- `exitcancel join`: a worker waits in `pthread_join` on another that waits in `pthread_cond_wait`.
+- `exitcancel nocancel`: the worker has turned cancel off, so it never wakes. After about 2 s one line, `DH2:...exitcancel: pthread 1 (pthread): did not end within 2 s of exit, so it was removed`, goes to the Shell and to `T:pthreads-exit.log`, and the program returns.
+- `exitcancel ctrlc`: `main` waits for Ctrl-C (`Break <cli> C`), then returns as `cond` does. Ctrl-C stays a break for the main thread.
+- `exitcancel cancel`: `pthread_cancel` while the program runs. The worker's clean-up handler runs with the mutex held (the wait relocked it) and `pthread_join` gives `PTHREAD_CANCELED`. It prints `PASS` (rc 0) or `FAIL` (rc 10).
+
+```bash
+m68k-amigaos-gcc -m68040 -O2 -noixemul -o exitcancel exitcancel.c -lpthread
+```
+
+With the stove's library (0001-0009) `cond` never returns, and Ctrl-C to it does not end it (lab: still running 13 s later); `sem`, `join` and `nocancel` wait at exit the same way, and in `cancel` the wait never wakes. With 0010 before its `pthread_exit` fix, `cancel` printed FAIL: join gave the thread's stale value, not `PTHREAD_CANCELED`. With 0010 every case returns as described (lab, 10 November 2026: 1.2-1.5 s for each run including the lab's own start-up, 4.2 s for `nocancel`).

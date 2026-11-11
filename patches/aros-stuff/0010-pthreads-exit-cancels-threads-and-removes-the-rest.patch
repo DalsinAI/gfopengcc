@@ -1,0 +1,416 @@
+pthreads: exit cancels the threads still running, and removes any left after 2 s
+
+At exit, __pthread_Exit_Func joins every thread (0007's ExitJoin). A thread
+that never ends kept the program from returning to the Shell: Code::Blocks'
+FileManager threads wait for work in pthread_cond_wait for ever, nothing
+asks them to stop, and QUIT left the window gone but the command still
+running (main in ExitJoin's Delay(2) loop). Ctrl-C did not help.
+
+Exit now works as a program's end does on Linux, where the other threads
+die with the process:
+
+1. Every thread still running is made joinable and pthread_cancel()ed.
+   Ctrl-C (SIGBREAKF_CTRL_C) is the cancel signal. USE_ASYNC_CANCEL is off,
+   so pthreads used no break signal. pthread_cancel() now sends it to the
+   thread, and these waits wake on it and act on the cancel:
+   pthread_cond_wait, pthread_cond_timedwait, sem_wait, sem_timedwait
+   (both wait on a condition), pthread_join and pthread_testcancel.
+   A cancel at exit skips the clean-up handlers and the TLS destructors,
+   because the program is ending and they may need the main thread.
+   A cancel at any other time runs them as before. With cancel turned off
+   (pthread_setcancelstate) a thread does not wake.
+   The main thread and tasks pthreads did not make (0008/0009) never take
+   Ctrl-C as a cancel: it stays a break for them.
+
+2. The joins get 2 s together. A thread still running after that is
+   removed before the code goes: Forbid, RemTask, its waits on pthreads'
+   own semaphores taken out, Permit. One line per thread goes to the
+   Shell and to T:pthreads-exit.log:
+     <command>: pthread N (name): did not end within 2 s of exit, so it was removed
+   A Ctrl-C to the main thread during the wait ends the 2 s at once.
+   A removed thread's memory and stack are not freed: whatever it held may
+   be in any state. The program has ended, so that memory is only lost
+   until the next reboot.
+
+pthread_exit()'s value never reached pthread_join(): StarterFunc stored
+its own return value after the jump back from pthread_exit(), and that
+local was not set on that path, so join got whatever it held. The value a
+thread returns is now stored where it returns, and pthread_exit()'s value
+(PTHREAD_CANCELED for a cancel) is kept.
+
+Not cancellation points here: sleep(), usleep(), nanosleep(), select()
+and the socket waits are libnix's, not pthreads'. A thread in one of
+those is removed after the 2 s.
+
+diff --git a/pthreads/pthread.c b/pthreads/pthread.c
+--- a/pthreads/pthread.c
++++ b/pthreads/pthread.c
+@@ -24,6 +24,7 @@
+ #include <sys/time.h>
+ #endif
+ #include <dos/dostags.h>
++#include <dos/dosextens.h>
+ #include <proto/exec.h>
+ #include <proto/dos.h>
+ #include <proto/timer.h>
+@@ -132,6 +133,13 @@
+    growing the table must not realloc the ThreadInfos themselves. */
+ static ThreadInfo **_threads;
+ static unsigned numThreads;
++#if defined(__AMIGA__) && !defined(__MORPHOS__) && !defined(__AROS__)
++/* Exit is under way (__pthread_Exit_Func): the threads still running are being
++   cancelled, as Linux's exit() ends them, so their clean-up handlers and TLS
++   destructors don't run (the program's own clean-up is done by then). */
++static volatile char exit_cancel;
++#define CANCEL_SIGNAL SIGBREAKF_CTRL_C
++#endif
+ static struct SignalSemaphore thread_sem;
+ static TLSKey *_tlskeys;
+ static unsigned numTlskeys;
+@@ -539,6 +547,29 @@
+ // Thread specific data functions
+ //
+ 
++#ifdef CANCEL_SIGNAL
++/* The cancel signal a blocking call of this thread also waits for: Ctrl-C, for a
++   thread pthread_create made whose cancellation is enabled (pthread_cancel
++   sends it). The main thread and foreign tasks get 0, so their Ctrl-C stays
++   the program's. */
++static ULONG CancelWaitMask(void) {
++	pthread_t self = pthread_self();
++	ThreadInfo *inf;
++	ULONG mask = 0;
++
++	if (!self)
++		return 0;
++	ObtainSemaphore(&thread_sem);
++	inf = GetThreadInfo(self);
++	if (inf && !inf->foreign && inf->cancelstate == PTHREAD_CANCEL_ENABLE)
++		mask = CANCEL_SIGNAL;
++	ReleaseSemaphore(&thread_sem);
++	return mask;
++}
++#else
++#define CancelWaitMask() 0UL
++#endif
++
+ int pthread_key_create(pthread_key_t *key, void (*destructor)(void*)) {
+ 	TLSKey *tls;
+ 	int i;
+@@ -1036,6 +1067,8 @@
+ 	struct MsgPort timermp;
+ 	struct timerequest timerio;
+ 	struct Task *task;
++	ULONG cancelmask;
++	int timedout = 0;
+ 
+ 	DB2(bug("%s(%8lx, %8lx, %8lx)\n", __FUNCTION__, cond, mutex, abstime));
+ 
+@@ -1043,6 +1076,7 @@
+ 		return EINVAL;
+ 
+ 	pthread_testcancel();
++	cancelmask = CancelWaitMask();
+ 
+ 	// initialize static conditions
+ 	if (SemaphoreIsInvalid(&cond->semaphore))
+@@ -1116,7 +1150,7 @@
+ 		SetSignal(SIGF_COND_FALLBACK, 0);
+ 	}
+ 	waiter.sigmask = 1 << signal;
+-	sigs |= waiter.sigmask;
++	sigs |= waiter.sigmask | cancelmask;
+ 
+ 	// add it to the end of the list
+ 	ObtainSemaphore(&cond->semaphore);
+@@ -1151,10 +1185,16 @@
+ 
+ 		// did we timeout?
+ 		if (sigs & timermask)
+-			return ETIMEDOUT;
++			timedout = 1;
+ 	}
+ 
+-	return 0;
++	// woken by pthread_cancel: the mutex is held again and the waiter is gone, as
++	// POSIX has it for a cancelled wait. (A Ctrl-C with no cancel behind it is a
++	// spurious wakeup, which a caller of pthread_cond_wait already allows for.)
++	if (sigs & cancelmask)
++		pthread_testcancel();
++
++	return timedout ? ETIMEDOUT : 0;
+ }
+ 
+ int pthread_cond_timedwait(pthread_cond_t *cond, pthread_mutex_t *mutex, const struct timespec *abstime) {
+@@ -1858,11 +1898,14 @@
+ 			stack.stk_Pointer = stack.stk_Upper;
+ #endif
+ 
+-			inf->ret = (void *)NewStackSwap(&stack, inf->start, &swapargs);
++			ret = (void *)NewStackSwap(&stack, inf->start, &swapargs);
+ #endif
+ 		} else {
+ 			ret = start(arg);
+ 		}
++		// the thread returned: its value. pthread_exit() stored its own in
++		// inf->ret and jumps past here (ret is not to be trusted after longjmp)
++		inf->ret = ret;
+ 		Forbid();
+ 	}
+ 	// we end up here with Forbid() called before longjmp()
+@@ -1874,6 +1917,10 @@
+ 	// destroy all non-NULL TLS key values
+ 	// since the destructors can set the keys themselves, we have to do multiple iterations
+ 	ObtainSemaphoreShared(&tls_sem);
++#ifdef CANCEL_SIGNAL
++	if (exit_cancel)
++		foundkey = FALSE;	// exit ends the thread: no destructors (see exit_cancel)
++#endif
+ 	for (j = 0; foundkey && j < PTHREAD_DESTRUCTOR_ITERATIONS; j++) {
+ 		foundkey = FALSE;
+ 		for (i = 0; i < numTlskeys; i++) {
+@@ -1890,7 +1937,6 @@
+ 	// inf may be invalid due to realloc
+ 	ObtainSemaphore(&thread_sem);
+ 	inf = GetThreadInfo(pid);
+-	inf->ret = ret;
+ 
+ #ifdef USE_ASYNC_CANCEL
+ 	// remove the exception handler
+@@ -2038,8 +2084,10 @@
+ 	struct Task * task = SysBase->ThisTask;
+ 	BYTE signal;
+ 	ULONG got, putback = 0;
++	ULONG cancelmask;
+ 
+ 	pthread_testcancel();
++	cancelmask = CancelWaitMask();
+ 
+ 	D(bug("%s(%ld, %8lx)\n", __FUNCTION__, thread, value_ptr));
+ 	if (!thread || pthread_self() == thread)
+@@ -2077,11 +2125,27 @@
+ 	while (!inf->started || !inf->finished) {
+ 		ReleaseSemaphore(&thread_sem);
+ 		D(bug("%s waiting for signal (%ld, inf=%8lx, fini=%ld)\n", __FUNCTION__, thread, inf, (int)inf->finished));
+-		got = Wait(1UL << signal);
++		got = Wait((1UL << signal) | cancelmask);
+ 		ObtainSemaphore(&thread_sem);
+ 		inf = GetThreadInfo(thread);
+ 		if (signal == SIGB_PARENT && (!inf->started || !inf->finished))
+ 			putback |= got & SIGF_PARENT;	// woken, but the thread runs on: not its Ctrl-F
++		if ((got & cancelmask) && (!inf->started || !inf->finished)) {
++			ThreadInfo *me = GetThreadInfo(pthread_self());
++			if (me && me->canceled) {
++				// cancelled while joining: the thread joined stays joinable
++				inf->joiner = NULL;
++				inf->joinmask = 0;
++				ReleaseSemaphore(&thread_sem);
++				if (signal != SIGB_PARENT)
++					FreeSignal(signal);
++				else if (putback)
++					SetSignal(putback, putback);
++				pthread_testcancel();
++				ObtainSemaphore(&thread_sem);	// not reached
++				inf = GetThreadInfo(thread);
++			}
++		}
+ 	}
+ 	// the thread has ended. If it signalled while this task wasn't in Wait (it was taking
+ 	// thread_sem), its signal is still pending: clear it, so neither a later AllocSignal
+@@ -2170,6 +2234,13 @@
+ 		else
+ 			Signal(inf->task, SIGBREAKF_CTRL_C); // trigger the exception handler 
+ 	}
++#ifdef CANCEL_SIGNAL
++	// deferred: wake it if it waits in a cancellation point (cond, sem, join);
++	// it ends at that point or the next one
++	else if (inf->started && !inf->finished && inf->task && inf->task != (struct Task *)-1
++		&& inf->task != SysBase->ThisTask)
++		Signal(inf->task, CANCEL_SIGNAL);
++#endif
+ 	ReleaseSemaphore(&thread_sem);
+ 
+ 	return 0;
+@@ -2250,9 +2321,13 @@
+ 	inf = GetThreadInfo(pid);
+ 	inf->ret = value_ptr;
+ 
+-	// execute the clean-up handlers
++	// execute the clean-up handlers (not when exit ends the thread: see exit_cancel)
+ 	while ((handler = (CleanupHandler*) RemTail((struct List*) &inf->cleanup)))
+-		if (handler->routine)
++		if (handler->routine
++#ifdef CANCEL_SIGNAL
++			&& !exit_cancel
++#endif
++			)
+ 			handler->routine(handler->arg);
+ 
+ 	// only for threads pthread_create made: a foreign task has no jump point and
+@@ -2513,6 +2588,114 @@
+ 	return parked;
+ }
+ 
++#ifdef CANCEL_SIGNAL
++/* Exit gives the threads it cancelled EXIT_TICKS in all (2 s) to end. One still
++   running after that (cancellation disabled, or blocked in a call that is no
++   cancellation point) is removed, so it can never run again in the code that
++   is unloaded next: its task leaves exec's lists (RemTask) with its memory
++   kept (tc_MemEntry emptied first: a semaphore or port may still hold a node
++   on its stack, and a Signal() to a removed task only sets bits). Its waits on
++   pthreads' own semaphores are taken out of their queues, so they are never
++   handed to it. Each removal is one line on the program's output and in
++   T:pthreads-exit.log. A Ctrl-C to the program while it waits ends the wait. */
++#define EXIT_TICKS 100
++static LONG exit_ticks = EXIT_TICKS;
++
++static void PurgeWaiter(struct SignalSemaphore *sem, struct Task *t)
++{
++	struct SemaphoreRequest *sr, *next;
++
++	for (sr = (struct SemaphoreRequest *)sem->ss_WaitQueue.mlh_Head;
++	     (next = (struct SemaphoreRequest *)sr->sr_Link.mln_Succ); sr = next)
++		if (((ULONG)sr->sr_Waiter & ~1UL) == (ULONG)t) {
++			Remove((struct Node *)sr);
++			sem->ss_QueueCount--;
++		}
++}
++
++static char *PutNum(char *p, ULONG n)
++{
++	char b[12];
++	int i = 0;
++
++	do b[i++] = '0' + n % 10; while (n /= 10);
++	while (i)
++		*p++ = b[--i];
++	return p;
++}
++
++static void ExitLog(pthread_t thread, const char *name)
++{
++	static const char what[] = ": did not end within 2 s of exit, so it was removed\n";
++	char line[160], *p = line;
++	const char *prog = FindTask(NULL)->tc_Node.ln_Name;
++	struct CommandLineInterface *cli = BADDR(((struct Process *)FindTask(NULL))->pr_CLI);
++	BPTR fh;
++	int i;
++
++	if (cli && cli->cli_CommandName) {
++		UBYTE *b = BADDR(cli->cli_CommandName);
++		for (i = 0; i < b[0] && i < 60; i++)
++			*p++ = b[1 + i];
++	} else
++		for (i = 0; prog && prog[i] && i < 60; i++)
++			*p++ = prog[i];
++	memcpy(p, ": pthread ", 10); p += 10;
++	p = PutNum(p, thread);
++	*p++ = ' '; *p++ = '(';
++	for (i = 0; name && name[i] && name[i] != ' ' && i < 30; i++)	// pthread_create pads it
++		*p++ = name[i];
++	*p++ = ')';
++	memcpy(p, what, sizeof what - 1); p += sizeof what - 1;
++	if ((fh = Output()))
++		Write(fh, line, p - line);
++	if ((fh = Open((STRPTR)"T:pthreads-exit.log", MODE_READWRITE))) {
++		Seek(fh, 0, OFFSET_END);
++		Write(fh, line, p - line);
++		Close(fh);
++	}
++}
++
++static int ExitRemove(pthread_t thread)
++{
++	ThreadInfo *inf;
++	struct Task *t;
++	char name[NAMELEN];
++
++	ObtainSemaphore(&thread_sem);
++	inf = GetThreadInfo(thread);
++	if (inf == NULL || !inf->task || inf->task == (struct Task *)-1 || (inf->started && inf->finished)) {
++		ReleaseSemaphore(&thread_sem);
++		return 0;		// it ended after all: joined as usual
++	}
++	t = inf->task;
++	Forbid();
++	strncpy(name, t->tc_Node.ln_Name ? t->tc_Node.ln_Name : "", NAMELEN - 1);
++	name[NAMELEN - 1] = 0;
++	NEWLIST(&t->tc_MemEntry);
++	RemTask(t);
++	PurgeWaiter(&thread_sem, t);
++	PurgeWaiter(&tls_sem, t);
++	inf->task = NULL;	// the slot is no longer a thread's
++	inf->finished = 1;
++	Permit();
++	ReleaseSemaphore(&thread_sem);
++	ExitLog(thread, name);
++	return 1;
++}
++
++static int ExitTick(void)
++{
++	if (SetSignal(0, 0) & SIGBREAKF_CTRL_C)
++		exit_ticks = 0;
++	if (exit_ticks <= 0)
++		return 0;
++	Delay(2);
++	exit_ticks -= 2;
++	return 1;
++}
++#endif
++
+ static void ExitJoin(pthread_t thread)
+ {
+ 	for (;;) {
+@@ -2531,7 +2714,12 @@
+ 		}
+ 		if (!inf->started) {		// still in creation: wait for it to start
+ 			ReleaseSemaphore(&thread_sem);
++#ifdef CANCEL_SIGNAL
++			if (!ExitTick() && ExitRemove(thread))
++				return;
++#else
+ 			Delay(2);
++#endif
+ 			continue;
+ 		}
+ 		parked = TaskParked(inf->task);
+@@ -2540,7 +2728,12 @@
+ 			D(bug("%s(%ld): its task is parked after a crash, left behind\n", __FUNCTION__, thread));
+ 			return;
+ 		}
++#ifdef CANCEL_SIGNAL
++		if (!ExitTick() && ExitRemove(thread))
++			return;
++#else
+ 		Delay(2);
++#endif
+ 	}
+ 	pthread_join(thread, NULL);
+ }
+@@ -2562,6 +2755,25 @@
+ 	// wait for the threads?
+ #if defined(__MORPHOS__) || defined(__AMIGA__)
+ 
++#ifdef CANCEL_SIGNAL
++	// end the threads still running, as exit() does on Linux: cancel each (it
++	// ends at its next cancellation point, a blocking wait included), then join
++	// them below, in 2 s in all
++	exit_cancel = 1;
++	for (i = 1; i < numThreads; i++) {
++		ThreadInfo *inf;
++
++		ObtainSemaphore(&thread_sem);
++		inf = GetThreadInfo(i);
++		if (inf && !inf->foreign && inf->task && inf->task != (struct Task *)-1 && !inf->finished) {
++			inf->attr.detachstate = PTHREAD_CREATE_JOINABLE;
++			ReleaseSemaphore(&thread_sem);
++			pthread_cancel(i);
++		} else
++			ReleaseSemaphore(&thread_sem);
++	}
++#endif
++
+ 	// if we don't do this we can easily end up with unloaded code being executed
+ 	for (i = 1; i < numThreads; i++) {
+ 		// a thread might still be in creation!
