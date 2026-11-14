@@ -142,4 +142,18 @@ for opt in -O1 -O2; do
   elif grep -q 'virtual-' "$O"/vregs.c.*.vregs; then echo "[$opt] vregs dump: WRONG (a virtual register is left after vregs)"; bad=1
   else echo "[$opt] vregs dump: right (no virtual register after vregs)"; fi
 done
+# fold-mem-offsets must not fold an add into a memory-to-memory move: p = out + here + 8 was folded
+# into the four stores through p and deleted, but move.b (a1),2(a0) kept its 2 (GFOpenBench's "WB\0C")
+for c in "-O2 -m68040 m68040" "-O3 -m68040 m68040" "-O2 -m68060 m68060" "-O3 -m68060 m68060" "-Os -m68040 m68040"; do
+  opt=${c% *}; qcpu=${c##* }; cpu=${opt#* }
+  "$CC" $opt "$@" -c "$D/fmo.c" -o "$O/fmo.o" && "$CC" $cpu -O1 -c "$D/fmo_g.c" -o "$O/fmo_g.o" &&
+    image fmo "$cpu" "$O/fmo_g.o" && echo -n "[$opt] " && run fmo fmo "$qcpu" || built "[$opt] fmo"
+done
+# and with -fno-late-combine-instructions, the PR123853 workaround GFOpenBench's tests/amiga build still passes,
+# which is what brought the fault out in PREFSWB_judge.c
+for cpu in -m68040 -m68060; do
+  qcpu=${cpu#-}; opt="-O2 $cpu -fno-late-combine-instructions"
+  "$CC" $opt "$@" -c "$D/fmo.c" -o "$O/fmo.o" && "$CC" $cpu -O1 -c "$D/fmo_g.c" -o "$O/fmo_g.o" &&
+    image fmo "$cpu" "$O/fmo_g.o" && echo -n "[$opt] " && run fmo fmo "$qcpu" || built "[$opt] fmo"
+done
 exit $bad

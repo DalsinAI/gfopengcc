@@ -240,7 +240,7 @@ def main():
             normalization = f"--sort=name --mtime=@{epoch} --owner=0 --group=0 --numeric-owner"
             command(f"run {number}: package",
                     ["bash", "scripts/package.sh", work, prefix, record / "packages",
-                     "16.2.0-open7"], record / "package.log", {"TAR_OPTIONS": normalization})
+                     "16.2.0-open8"], record / "package.log", {"TAR_OPTIONS": normalization})
             entries = manifest(prefix)
             (record / "prefix-manifest.json").write_text(json.dumps(entries, sort_keys=True,
                                                                      indent=2) + "\n")

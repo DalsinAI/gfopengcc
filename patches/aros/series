@@ -17,6 +17,7 @@ gcc       gcc/0005-fmalloc-memset-to-calloc-and-never-turn-calloc-s-own.patch
 gcc       aros/gcc/0008-stock-m68k-a-DImode-shift-by-32-pushed-from-a-stack-slot.patch
 gcc       gcc/0013-m68k-no-move-addresses-its-destination-through-the-r.patch
 gcc       gcc/0014-vregs-virtual-registers-inside-an-address-operand-ar.patch
+gcc       gcc/0019-fold-mem-offsets-a-memory-to-memory-move-is-no-root.patch
 #
 # 0008 is ported: the same splits and the same function, which goes at the end of
 # stock m68k.cc (bebbo's m68k.cc ends with m68k_preferred_doloop_mode instead).
