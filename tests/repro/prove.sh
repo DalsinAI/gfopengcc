@@ -149,4 +149,11 @@ for c in "-O2 -m68040 m68040" "-O3 -m68040 m68040" "-O2 -m68060 m68060" "-O3 -m6
   "$CC" $opt "$@" -c "$D/fmo.c" -o "$O/fmo.o" && "$CC" $cpu -O1 -c "$D/fmo_g.c" -o "$O/fmo_g.o" &&
     image fmo "$cpu" "$O/fmo_g.o" && echo -n "[$opt] " && run fmo fmo "$qcpu" || built "[$opt] fmo"
 done
+# and with -fno-late-combine-instructions, the PR123853 workaround GFOpenBench's tests/amiga build still passes,
+# which is what brought the fault out in PREFSWB_judge.c
+for cpu in -m68040 -m68060; do
+  qcpu=${cpu#-}; opt="-O2 $cpu -fno-late-combine-instructions"
+  "$CC" $opt "$@" -c "$D/fmo.c" -o "$O/fmo.o" && "$CC" $cpu -O1 -c "$D/fmo_g.c" -o "$O/fmo_g.o" &&
+    image fmo "$cpu" "$O/fmo_g.o" && echo -n "[$opt] " && run fmo fmo "$qcpu" || built "[$opt] fmo"
+done
 exit $bad
