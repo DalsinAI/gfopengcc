@@ -1,0 +1,57 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: SacredTrees <121399723+SacredTrees@users.noreply.github.com>
+Date: Sat, 14 Nov 2026 16:30:00 +0000
+Subject: [PATCH] fold-mem-offsets: a memory-to-memory move is no root
+
+fold-mem-offsets folds a constant add into the memory accesses that use
+its result and then deletes the add, once every use of the result is a
+"root": an instruction get_fold_mem_root() takes as a load or store it
+can change.  An instruction with a MEM on both sides, which m68k has
+(move.b (a1),2(a0)), was taken as a root for its source's address only.
+The add feeding the destination's base register then had all its uses
+marked as roots, was deleted, and the destination kept its old
+displacement.
+
+GFOpenBench's PREFSWB_judge.c stored four bytes through
+p = out + here + 8; at -O2 with -m68040 or -m68060 the one whose source
+was memory came out as move.b (a1),2(a0) where 10(a0) is right, so a
+Workbench prefs chunk id was written "WB\0C" (gfopenbench #216).
+
+get_fold_mem_root() now refuses an instruction whose destination is a
+MEM and whose source is a MEM or a sign or zero extend of one.  Neither
+address is folded into such an instruction, and an add that feeds one
+stays.  On m68k the pass found almost nothing else to fold, and
+-fno-fold-mem-offsets, which turns it off, removed the fault alone.
+
+tests/repro/fmo.c is the case cut down (Team 5's trace); prove.sh runs it
+at -O2 and -O3 with -m68040 and -m68060, and -Os.
+
+Team 2 (Lister)
+---
+ gcc/fold-mem-offsets.cc | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
+
+diff --git a/gcc/fold-mem-offsets.cc b/gcc/fold-mem-offsets.cc
+--- a/gcc/fold-mem-offsets.cc
++++ b/gcc/fold-mem-offsets.cc
+@@ -596,6 +596,18 @@
+ 	  || GET_CODE (dest) == UNSPEC_VOLATILE)
+ 	return false;
+ 
++      /* A memory-to-memory move (m68k's move.b (a1),2(a0)) has two
++	 addresses.  This pass changes only the one MEM it returns, and a
++	 definition is folded once every use is a root, so an add feeding
++	 the other address would be deleted with that address left as it
++	 was.  Such an instruction is no root.  */
++      if (MEM_P (dest)
++	  && (MEM_P (src)
++	      || ((GET_CODE (src) == SIGN_EXTEND
++		   || GET_CODE (src) == ZERO_EXTEND)
++		  && MEM_P (XEXP (src, 0)))))
++	return false;
++
+       if (MEM_P (src))
+ 	mem = src;
+       else if (MEM_P (dest))
+-- 
+2.43.0
