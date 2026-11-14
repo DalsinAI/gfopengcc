@@ -6,12 +6,13 @@
    (2(a0) for 10(a0)).  GFOpenBench's P7 row wrote its WBNC chunk id as
    "WB\0C" (gfopenbench #216).  -O2 and -O3 with -m68040 or -m68060.
    The case is Lorien's (Team 5) cut down from PREFSWB_judge.c; g is in
-   fmo_g.c so that f is compiled knowing nothing of it.
+   fmo_g.c so that f is compiled knowing nothing of it, and f is noipa so
+   that at -O3 main calls this f, not a specialised copy of it.
    MIT licence, Copyright (c) 2026 AmiCradle Team. */
 extern void puts_(const char *);
 extern int g(unsigned char *out, long *n);
 
-__attribute__((noinline)) long f(unsigned char *out, long n, unsigned long v, unsigned long a, int k, const unsigned char *m)
+__attribute__((noinline, noipa)) long f(unsigned char *out, long n, unsigned long v, unsigned long a, int k, const unsigned char *m)
 {
   int done = 0;
   while (k--) {
