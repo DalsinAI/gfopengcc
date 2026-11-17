@@ -22,3 +22,11 @@ It returns 0 when the thread's `thread_local` was destroyed in time, and 20 othe
 ```bash
 CXX=m68k-amigaos-g++ NM=m68k-amigaos-nm tests/cxx/lean-check.sh
 ```
+
+## stoll.cpp
+
+`scripts/libstdcxx-c99-stdlib.sh` (step 6 of `scripts/build.sh`) turns on libstdc++'s C99 stdlib, which its configure leaves off for libnix, so `std::stoll`, `std::stoull` and `std::stold` exist for `std::string`. It compiles `stoll.cpp` with the new g++ and puts every `c++config.h` back if that fails. `c99-stdlib-check.sh` tests the script on the host with stand-in files (and runs `stoll.cpp` with the host's g++):
+
+```bash
+sh tests/cxx/c99-stdlib-check.sh
+```
