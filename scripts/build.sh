@@ -218,6 +218,9 @@ for f in $(find "$PREFIX/lib/gcc/m68k-amigaos" -path "*include/c++*" -name c++co
     grep -q "define $d 1" "$f" || sed -i "s|^/\* #undef $d \*/|#define $d 1|" "$f"
   done
 done
+# std::stoll, std::stoull and std::stold for std::string: libnix has strtoll,
+# strtoull and strtold, but libstdc++'s configure leaves its C99 stdlib off.
+LOG="$LOGS/libstdcxx-c99-stdlib.log" sh "$HERE/scripts/libstdcxx-c99-stdlib.sh" "$PREFIX"
 
 # 6b. Shared libnix and its static support archive, for -mcrt=library.
 echo done > "$WORK/build-Linux-m68k-amigaos/gcc/_libgcc_done"   # step 6 built and installed them
