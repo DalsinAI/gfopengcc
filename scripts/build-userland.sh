@@ -103,9 +103,14 @@ BINUTILS_FOR=(AR="$PREFIX/bin/$CT-ar" RANLIB="$PREFIX/bin/$CT-ranlib" AS="$PREFI
 log glibc-configure sh -c "cd '$B/glibc' && CC='$PREFIX/bin/$CT-gcc' CXX=false ${BINUTILS_FOR[*]} \
     '$S/glibc-2.35/configure' --prefix=/usr --host=$CT --build=$(${HOST_CC:-cc} -dumpmachine) \
     --with-headers='$SYSROOT/usr/include' --with-binutils='$PREFIX/bin' --enable-kernel=3.2 --disable-werror \
-    --disable-crypt --disable-nscd --disable-build-nscd --disable-timezone-tools --disable-profile"
+    --disable-crypt --disable-nscd --disable-build-nscd --disable-timezone-tools --disable-profile \
+    --libdir=/usr/lib libc_cv_slibdir=/lib libc_cv_rtlddir=/lib"
 log glibc sh -c "cd '$B/glibc' && $NOFETCH make -j$JOBS && make install install_root='$SYSROOT'"
 rm -rf "$SYSROOT/usr/share" "$SYSROOT/usr/libexec" "$SYSROOT/usr/sbin" "$SYSROOT/sbin" "$SYSROOT/usr/bin" "$SYSROOT/var" "$SYSROOT/etc"
+# glibc goes in lib and usr/lib (where a GCC without multilibs looks), and lib64 and
+# usr/lib64 name the same folders, so the dynamic linker's ABI path
+# (/lib64/ld-linux-x86-64.so.2) and a lib64 search find them too.
+for d in "$SYSROOT/lib64" "$SYSROOT/usr/lib64"; do [ -e "$d" ] || ln -s lib "$d"; done
 
 # 7. The GCC that ships: C and C++, shared libgcc_s and libstdc++, POSIX threads,
 #    PIE by default, over the sysroot.
