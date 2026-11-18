@@ -60,3 +60,17 @@ m68k-amigaos-gcc -m68040 -O2 -noixemul -o exitcancel exitcancel.c -lpthread
 ```
 
 With the stove's library (0001-0009) `cond` never returns, and Ctrl-C to it does not end it (lab: still running 13 s later); `sem`, `join` and `nocancel` wait at exit the same way, and in `cancel` the wait never wakes. With 0010 before its `pthread_exit` fix, `cancel` printed FAIL: join gave the thread's stale value, not `PTHREAD_CANCELED`. With 0010 every case returns as described (lab, 10 November 2026: 1.2-1.5 s for each run including the lab's own start-up, 4.2 s for `nocancel`).
+
+`condsignal.c` (`patches/aros-stuff/0011`): every `pthread_cond_signal` wakes a thread that is still waiting. One run, about 5 s:
+- `two signals`: two threads wait for work, two pieces arrive and `pthread_cond_signal` is called twice before either thread has run. Both must wake within 2 s.
+- `timed out`: the first waiter's timed wait of 1 s runs out while the main thread holds the mutex for 1.5 s, so that thread is awake but has not come back from its wait. Then one piece of work arrives with one `pthread_cond_signal`. The second waiter must wake within 2 s, and the first must get `ETIMEDOUT`.
+- `broadcast`: three threads wait, three pieces arrive with one `pthread_cond_broadcast`. All three must wake.
+- `destroy`: the same on a condition of its own, with `pthread_cond_destroy` straight after the broadcast, while the mutex is still held and no waiter has run. It must return 0, and all three must still wake: a woken waiter may not touch the condition again.
+
+It prints PASS or FAIL for each check, then `condsignal OK` (rc 0) or `condsignal FAILED` (rc 20). A case that fails wakes its sleepers itself; `destroy` cannot, so it leaves them for exit to remove (0010, about 2 s). The program always returns.
+
+```bash
+m68k-amigaos-gcc -m68040 -O2 -Wall -noixemul -o condsignal condsignal.c -lpthread
+```
+
+With the stove's library (0001-0010) both signals of `two signals` go to the first waiter, and the signal of `timed out` goes to the thread whose wait had run out, so the other thread sleeps on in each: those two checks are expected to fail, and so is `destroy`'s first, because that library answers `EBUSY` while a woken waiter has not yet come back. With 0011 every check should pass.

@@ -1,0 +1,136 @@
+pthreads: every pthread_cond_signal wakes a thread that is still waiting
+
+pthread_cond_signal sent its signal to the first waiter on the condition's
+list and left it there. A waiter took itself off the list only after it
+had woken and locked the mutex again. So a signal could go to a thread
+that was no longer waiting, and wake nobody:
+
+1. Two signals in a row. With two threads waiting, two calls of
+   pthread_cond_signal before the first waiter had run both went to the
+   first waiter. The second thread slept on with its work queued.
+
+2. A waiter whose wait had ended. A timed wait that had run out (or a wait
+   woken by a break) stayed first on the list until it got the mutex. A
+   pthread_cond_signal in that time went to it. It returned ETIMEDOUT, and
+   a caller that gives up on ETIMEDOUT never looked at the condition, while
+   the next waiter slept on. A stall makes this the usual order: every
+   timer request that fell due during the stall completes at once when the
+   machine runs again.
+
+Now pthread_cond_signal and pthread_cond_broadcast take each waiter they
+wake off the list (and mark it), so the next signal goes to the next
+waiter. A waiter takes itself off the list as soon as it wakes, before it
+locks the mutex, unless a signal has already taken it off. A timed wait
+that ran out and was signalled as well returns 0, not ETIMEDOUT, so its
+caller looks at the condition.
+
+A waiter that has been signalled does not touch the condition again:
+pthread_cond_destroy may follow a broadcast at once (C++ teardown does),
+and it now finds the list empty and wipes the condition. So every change
+to the list is made under Forbid, and a woken waiter looks at its own
+node under Forbid alone, without the condition's semaphore. For the same
+reason a cancelled thread that had been signalled as well does not pass
+the signal on, as before this patch.
+
+Test: tests/pthreads/condsignal.c.
+
+diff --git a/pthreads/pthread.c b/pthreads/pthread.c
+index 3047664..4f4134c 100644
+--- a/pthreads/pthread.c
++++ b/pthreads/pthread.c
+@@ -88,6 +88,7 @@ typedef struct {
+ 	struct MinNode node;
+ 	struct Task *task;
+ 	ULONG sigmask;
++	BOOL signalled;	// taken off the list by pthread_cond_signal or _broadcast
+ } CondWaiter;
+ 
+ typedef struct {
+@@ -1150,25 +1151,37 @@ static int _pthread_cond_timedwait(pthread_cond_t *cond, pthread_mutex_t *mutex,
+ 		SetSignal(SIGF_COND_FALLBACK, 0);
+ 	}
+ 	waiter.sigmask = 1 << signal;
++	waiter.signalled = FALSE;
+ 	sigs |= waiter.sigmask | cancelmask;
+ 
+ 	// add it to the end of the list
+ 	ObtainSemaphore(&cond->semaphore);
++	Forbid();
+ 	AddTail((struct List*) &cond->waiters, (struct Node*) &waiter);
++	Permit();
+ 	ReleaseSemaphore(&cond->semaphore);
+ 
+ 	// wait for the condition to be signalled or the timeout
+ 	mutex->incond++;
+ 	pthread_mutex_unlock(mutex);
+ 	sigs = Wait(sigs);
++
++	// Leave the list now, before the mutex: the mutex can take a while, and a
++	// waiter that woke for its timeout or a break and was still listed took the
++	// next pthread_cond_signal, which then woke nobody. pthread_cond_signal and
++	// _broadcast take the waiters they wake off the list themselves, so a
++	// waiter that is not signalled here is still on it.
++	// Every change to the list is made under Forbid, and this one under Forbid
++	// alone: a signalled waiter must not touch the condition again, because
++	// pthread_cond_destroy may follow a broadcast at once and wipe it.
++	Forbid();
++	if (!waiter.signalled)
++		Remove((struct Node*) &waiter);
++	Permit();
++
+ 	pthread_mutex_lock(mutex);
+ 	mutex->incond--;
+ 
+-	// remove the node from the list
+-	ObtainSemaphore(&cond->semaphore);
+-	Remove((struct Node*) &waiter);
+-	ReleaseSemaphore(&cond->semaphore);
+-
+ 	if (signal != SIGB_COND_FALLBACK)
+ 		FreeSignal(signal);
+ 
+@@ -1183,14 +1196,18 @@ static int _pthread_cond_timedwait(pthread_cond_t *cond, pthread_mutex_t *mutex,
+ 		if (timermp.mp_SigBit != SIGB_TIMER_FALLBACK)
+ 			FreeSignal(timermp.mp_SigBit);
+ 
+-		// did we timeout?
+-		if (sigs & timermask)
++		// did we timeout? Not if a signal reached this waiter as well: it was
++		// the one thread that signal woke, so the caller must look at its
++		// condition, which ETIMEDOUT lets it skip.
++		if ((sigs & timermask) && !waiter.signalled)
+ 			timedout = 1;
+ 	}
+ 
+ 	// woken by pthread_cancel: the mutex is held again and the waiter is gone, as
+ 	// POSIX has it for a cancelled wait. (A Ctrl-C with no cancel behind it is a
+ 	// spurious wakeup, which a caller of pthread_cond_wait already allows for.)
++	// (A signal that reached this waiter as well is not passed on: the condition
++	// may be gone by now.)
+ 	if (sigs & cancelmask)
+ 		pthread_testcancel();
+ 
+@@ -1227,14 +1244,21 @@ static int _pthread_cond_broadcast(pthread_cond_t *cond, BOOL onlyfirst) {
+ 	if (SemaphoreIsInvalid(&cond->semaphore))
+ 		pthread_cond_init(cond, NULL);
+ 
+-	// signal the waiting threads 
++	// signal the waiting threads. Each one woken is taken off the list here, so
++	// a second pthread_cond_signal before the first waiter has run wakes the
++	// next waiter, not the same one again. The waiter's node is on its stack:
++	// it stays valid because the waiter looks at it under Forbid before it
++	// returns, and Forbid is held here from the RemHead to the Signal.
+ 	ObtainSemaphore(&cond->semaphore);
+-	ForeachNode(&cond->waiters, waiter)
++	Forbid();
++	while ((waiter = (CondWaiter*) RemHead((struct List*) &cond->waiters)) != NULL)
+ 	{
++		waiter->signalled = TRUE;
+ 		Signal(waiter->task, waiter->sigmask);
+ 		if (onlyfirst)
+ 			break;
+ 	}
++	Permit();
+ 	ReleaseSemaphore(&cond->semaphore);
+ 
+ 	return 0;
