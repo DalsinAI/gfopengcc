@@ -2,7 +2,7 @@
 # tests/userland-recipe.sh
 # The Linux userland compilers' recipe (x86_64, aarch64) is what it says it is, before any build:
 # - scripts/userland.lock pins the same GCC and binutils as scripts/aros.lock
-#   (and so the kernel compilers'), glibc 2.35 and Linux 5.15, and nothing else;
+#   (and so the kernel compilers'), glibc 2.35, Linux 5.15 and zlib 1.3.1, and nothing else;
 # - scripts/build-userland.sh applies patches/linux/series (tests/linux-recipe.sh
 #   checks that series), gives the release identity, builds C and C++ over a
 #   sysroot inside the prefix, and has the two targets.
@@ -23,7 +23,8 @@ done
 [ "$(file "$LOCK" glibc)" = glibc-2.35.tar.xz ] || fail "$(basename "$LOCK") does not pin glibc 2.35 (the floor)"
 [ "$(file "$LOCK" linux)" = linux-5.15.tar.gz ] || fail "$(basename "$LOCK") does not pin Linux 5.15's headers"
 [ -n "$(pin "$LOCK" glibc)" ] && [ -n "$(pin "$LOCK" linux)" ] || fail "glibc or linux has no SHA-256"
-[ "$(grep -v '^#' "$LOCK" | awk 'NF' | wc -l)" -eq 4 ] || fail "$(basename "$LOCK") pins something other than gcc, binutils, glibc and linux"
+[ "$(file "$LOCK" zlib)" = zlib-1.3.1.tar.gz ] && [ -n "$(pin "$LOCK" zlib)" ] || fail "$(basename "$LOCK") does not pin zlib 1.3.1"
+[ "$(grep -v '^#' "$LOCK" | awk 'NF' | wc -l)" -eq 5 ] || fail "$(basename "$LOCK") pins something other than gcc, binutils, glibc, linux and zlib"
 for f in $(grep -v '^#' "$LOCK" | awk 'NF { print $4 }'); do
   grep -qF "\$A/$f\"" "$BUILD" || fail "$(basename "$BUILD") does not unpack $f"
 done

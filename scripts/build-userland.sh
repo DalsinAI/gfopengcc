@@ -4,7 +4,7 @@
 # compiler on x86-64 Linux for programs (C and C++), from the stock GCC 16.2.0
 # and binutils 2.47 with patches/linux/series and the release identity, over a
 # sysroot of glibc 2.35 and Linux 5.15's headers (Ubuntu 22.04's, the glibc
-# floor of AmiCradle's runtimes), all from scripts/userland.lock in WORK/userland
+# floor of AmiCradle's runtimes) and zlib 1.3.1, all from scripts/userland.lock in WORK/userland
 # (scripts/fetch-userland.sh). ARCH is
 #   x86_64   x86_64-linux-gnu: daletop, the CI runners, the AMD x86 appliance
 #   aarch64  aarch64-linux-gnu: the CM4 and Pi 5 cards
@@ -48,6 +48,7 @@ tar -C "$S" -xf "$A/gcc-16.2.0.tar.xz"
 tar -C "$S" -xf "$A/binutils-2.47.tar.bz2"
 tar -C "$S" -xf "$A/glibc-2.35.tar.xz"
 tar -C "$S" -xf "$A/linux-5.15.tar.gz"
+tar -C "$S" -xf "$A/zlib-1.3.1.tar.gz"
 grep -v '^#' "$HERE/patches/linux/series" | while read -r tree p; do
   [ -n "$tree" ] || continue
   case $tree in
@@ -122,12 +123,19 @@ log gcc-configure sh -c "cd '$B/gcc' && '$S/gcc-16.2.0/configure' ${COMMON[*]} \
     --disable-libcc1 --disable-libssp --with-glibc-version=2.35 ${GMP[*]} --with-pkgversion='$ID'"
 log gcc sh -c "cd '$B/gcc' && $NOFETCH make -j$JOBS && make -j1 install-strip"
 
+# 8. zlib 1.3.1 into the sysroot, by the GCC that ships (static and shared; a
+#    program that links -lz loads the system's libz.so.1).
+say "zlib 1.3.1"
+log zlib sh -c "cd '$S/zlib-1.3.1' && CC='$PREFIX/bin/$CT-gcc' AR='$PREFIX/bin/$CT-ar' RANLIB='$PREFIX/bin/$CT-ranlib' CFLAGS='-O2 -fPIC' \
+    ./configure --prefix=/usr --libdir=/usr/lib && $NOFETCH make -j$JOBS && make install DESTDIR='$SYSROOT'"
+rm -rf "$SYSROOT/usr/share"
+
 # x86_64: the programs also go by x86_64-linux-gnu-NAME.
 if [ "$CT" != "$T" ]; then
   for f in "$PREFIX/bin/$CT-"*; do ln -sfn "$(basename "$f")" "$PREFIX/bin/$T-${f##*/$CT-}"; done
 fi
 
-# 8. Checks.
+# 9. Checks.
 say checks
 "$HERE/tests/userland-check.sh" "$PREFIX" "$ARCH"
 echo "$("$PREFIX/bin/$T-gcc" --version | sed -n '1p') (glibc 2.35 sysroot) built in $PREFIX"

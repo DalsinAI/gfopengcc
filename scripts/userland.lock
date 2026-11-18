@@ -2,7 +2,9 @@
 # GCC and binutils are the kernel compilers' and m68k-aros's pins (tests/userland-recipe.sh keeps them equal).
 # glibc 2.35 and Linux 5.15's headers are Ubuntu 22.04's, the oldest system the runtimes start on (the glibc floor).
 # The sysroot's glibc is only linked against: a program runs on the system's own glibc.
+# zlib 1.3.1 goes into the sysroot too (the boards' tests and ac460run link -lz; every system has libz.so.1).
 gcc       https://ftp.gnu.org/gnu/gcc/gcc-16.2.0/gcc-16.2.0.tar.xz        e6738e29597f733270731aa90600f37ffdc045079dfc27ec7e8192cc81085c3e  gcc-16.2.0.tar.xz
 binutils  https://ftp.gnu.org/gnu/binutils/binutils-2.47.tar.bz2          3068128c75cda9f898ccb4211d360246e8e195ffcc9dfb655b23ae23a54800e8  binutils-2.47.tar.bz2
 glibc     https://ftp.gnu.org/gnu/glibc/glibc-2.35.tar.xz                 5123732f6b67ccd319305efd399971d58592122bcc2a6518a1bd2510dd0cf52e  glibc-2.35.tar.xz
 linux     http://archive.ubuntu.com/ubuntu/pool/main/l/linux/linux_5.15.0.orig.tar.gz  4d7908da75ad50a70a0141721e259c2589b7bdcc317f7bd885b80c2ffa689211  linux-5.15.tar.gz
+zlib      https://github.com/madler/zlib/releases/download/v1.3.1/zlib-1.3.1.tar.gz  9a93b2b7dfdac77ceba5a558a580e74667dd6fede4585b91eefb60f03b72df23  zlib-1.3.1.tar.gz

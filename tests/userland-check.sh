@@ -3,7 +3,7 @@
 # Checks a scripts/build-userland.sh toolchain for ARCH (x86_64 or aarch64) in PREFIX:
 # - ARCH-linux-gnu-gcc --version names the release (patches/amiga-gcc/0002's identity);
 # - its programs (gcc, g++, cc1, cc1plus, as, ld) link no GMP, MPFR or MPC shared library;
-# - the sysroot is inside PREFIX and holds glibc 2.35;
+# - the sysroot is inside PREFIX and holds glibc 2.35 (and zlib: tests/userland/zlib.c);
 # - tests/userland/hello.c (threads, dlopen, libm, TLS) and hello.cpp (iostream,
 #   std::thread, exceptions, -static-libstdc++) build at -O2, are PIE, ask for no
 #   glibc symbol above 2.35, and print "ARCH c ok" / "ARCH c++ ok" (x86_64
@@ -55,4 +55,6 @@ check hello.c "$O/hello-c" "$ARCH c ok"
 "$CXX" -std=gnu++20 -O2 -DARCH="\"$ARCH\"" -static-libstdc++ -static-libgcc -o "$O/hello-cxx" "$HERE/tests/userland/hello.cpp" -lpthread \
   || fail "hello.cpp does not build"
 check hello.cpp "$O/hello-cxx" "$ARCH c++ ok"
+"$CC" -std=gnu11 -O2 -DARCH="\"$ARCH\"" -o "$O/zlib" "$HERE/tests/userland/zlib.c" -lz || fail "zlib.c does not build (no zlib in the sysroot)"
+check zlib.c "$O/zlib" "$ARCH zlib ok"
 echo "$ARCH userland check: all passed in $P"
