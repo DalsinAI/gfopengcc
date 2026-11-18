@@ -15,6 +15,10 @@ on:
         description: 'Publish this build as a release, e.g. 16.2.0-open7 (needs docs/releases/<version>.md); empty builds only'
         required: false
         default: ''
+      rc:
+        description: 'With release: publish it as release candidate N, a pre-release tagged v<release>-rcN (e.g. 1); empty publishes the release itself'
+        required: false
+        default: ''
 
 concurrency:
   group: build-${{ github.ref }}
@@ -49,8 +53,11 @@ jobs:
             libgmp-dev libmpfr-dev libmpc-dev rsync git lhasa autoconf gettext \
             libncurses-dev libreadline-dev qemu-user python3
 
+      - name: The release names check refuses what it should
+        run: tests/release-names-test.sh
+
       - name: Release names agree
-        run: tests/release-names.sh ${{ inputs.release }}
+        run: tests/release-names.sh "${{ inputs.release }}" "${{ inputs.rc }}"
 
       - name: Compiler output readers drain their input
         run: python3 tests/compiler-output.py
@@ -204,9 +211,14 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           V: ${{ inputs.release }}
+          RC: ${{ inputs.rc }}
         run: |
           cd "$RUNNER_TEMP/out" && sha256sum -c SHA256SUMS && cd "$GITHUB_WORKSPACE"
-          gh release create "v$V" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
-            --title "GFOpenAmigaGCC $V" --notes-file "docs/releases/$V.md" \
+          # A release candidate is a pre-release of the same build: tag v$V-rcN, the files keep the
+          # release's names (the compiler says $V), so the release itself can be the same bytes.
+          TAG="v$V"; TITLE="GFOpenAmigaGCC $V"; PRE=()
+          if [ -n "$RC" ]; then TAG="v$V-rc$RC"; TITLE="GFOpenAmigaGCC $V RC$RC"; PRE=(--prerelease); fi
+          gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" "${PRE[@]}" \
+            --title "$TITLE" --notes-file "docs/releases/$V.md" \
             "$RUNNER_TEMP/out/gfopenamigagcc-$V-x86_64-linux.tar.xz" \
             "$RUNNER_TEMP/out/gfopenamigagcc-$V-src.tar.xz" "$RUNNER_TEMP/out/SHA256SUMS"

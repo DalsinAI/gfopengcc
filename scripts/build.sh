@@ -241,7 +241,7 @@ say checks
 CC="$PREFIX/bin/m68k-amigaos-gcc"
 C=$LOGS/check; mkdir -p "$C"
 # The identity patches/amiga-gcc/0002 gives it (tests/release-names.sh keeps them in step).
-ID="GFOpenAmigaGCC 16.2.0-open8"
+ID="GFOpenAmigaGCC 16.2.0-open9"
 "$CC" --version | sed -n '1p' | grep -F "($ID)" > /dev/null || {
   echo "gcc does not identify itself as $ID"; exit 1;
 }
