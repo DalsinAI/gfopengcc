@@ -3,7 +3,10 @@
 # off for libnix, so <string> has no std::stoll, std::stoull or std::stold
 # for std::string (the wstring ones are there) and ports carry their own
 # (shiromino's amiga_stdstring.h). libnix has strtoll, strtoull and
-# strtold under them. This turns the two on in every installed c++config.h,
+# strtold under them (strtof and strtold in its libm, which g++ links), but
+# configure also left _GLIBCXX_HAVE_STRTOF and _GLIBCXX_HAVE_STRTOLD off, and
+# std::stold for std::string needs the second (on m68k long double is not
+# double). This turns the four on in every installed c++config.h,
 # then compiles tests/cxx/stoll.cpp with the new g++; if <cstdlib> or the
 # test does not compile with them on, every c++config.h is put back as it
 # was and it says why (the stove keeps building, as before).
@@ -18,7 +21,7 @@ files=$(find "$PREFIX/lib/gcc/m68k-amigaos" -path "*include/c++*" -name c++confi
 [ -n "$files" ] || { echo "no c++config.h under $PREFIX/lib/gcc/m68k-amigaos"; exit 1; }
 for f in $files; do
   cp "$f" "$f.c99-orig"
-  for d in _GLIBCXX11_USE_C99_STDLIB _GLIBCXX98_USE_C99_STDLIB; do
+  for d in _GLIBCXX11_USE_C99_STDLIB _GLIBCXX98_USE_C99_STDLIB _GLIBCXX_HAVE_STRTOF _GLIBCXX_HAVE_STRTOLD; do
     grep -q "define $d 1" "$f" || sed -i "s|^/\* #undef $d \*/|#define $d 1|" "$f"
   done
 done

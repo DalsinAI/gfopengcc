@@ -1,6 +1,6 @@
 #!/bin/sh
 # Host test for scripts/libstdcxx-c99-stdlib.sh: a stand-in PREFIX with two
-# c++config.h files and a stand-in g++. With a g++ that compiles, both
+# c++config.h files and a stand-in g++. With a g++ that compiles, the four
 # macros are turned on in both files and nothing else changes; with one that
 # fails, both files are byte for byte as before. Also runs stoll.cpp with the
 # host's g++, so the test's own values are right.
@@ -17,7 +17,7 @@ mk() {
   for m in . m68040; do
     d=$T/p/lib/gcc/m68k-amigaos/16.2.0/include/c++/m68k-amigaos/$m/bits
     mkdir -p "$d"
-    printf '/* #undef _GLIBCXX11_USE_C99_STDLIB */\n/* #undef _GLIBCXX98_USE_C99_STDLIB */\n/* #undef _GLIBCXX_USE_C99_FENV */\n#define _GLIBCXX_HAVE_STRTOLD 1\n' > "$d/c++config.h"
+    printf '/* #undef _GLIBCXX11_USE_C99_STDLIB */\n/* #undef _GLIBCXX98_USE_C99_STDLIB */\n/* #undef _GLIBCXX_USE_C99_FENV */\n/* #undef _GLIBCXX_HAVE_STRTOF */\n/* #undef _GLIBCXX_HAVE_STRTOLD */\n' > "$d/c++config.h"
   done
   find "$T/p" -name c++config.h | sort | xargs cat > "$T/before"
 }
@@ -31,6 +31,8 @@ ok 'echo "$out" | grep -q "C99 stdlib on"' "did not say it is on: $out"
 for f in $(find "$T/p" -name c++config.h); do
   ok 'grep -q "^#define _GLIBCXX11_USE_C99_STDLIB 1" "$f"' "$f: C++11 macro not on"
   ok 'grep -q "^#define _GLIBCXX98_USE_C99_STDLIB 1" "$f"' "$f: C++98 macro not on"
+  ok 'grep -q "^#define _GLIBCXX_HAVE_STRTOF 1" "$f"' "$f: strtof macro not on"
+  ok 'grep -q "^#define _GLIBCXX_HAVE_STRTOLD 1" "$f"' "$f: strtold macro not on (std::stold)"
   ok 'grep -q "^/\* #undef _GLIBCXX_USE_C99_FENV \*/" "$f"' "$f: another macro changed"
   ok '[ ! -e "$f.c99-orig" ]' "$f: backup left behind"
 done
