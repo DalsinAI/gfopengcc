@@ -1,8 +1,8 @@
 #!/bin/sh
 # Copyright (c) 2026 AmiCradle Team. MIT licence (see LICENSE at the repository root).
 # Cradle's way to run install-stove.sh on the machine its builds run on: a
-# stove build of this folder puts aros-stuff patch 0010 (pthreads' exit) into
-# that machine's os32-gcc16-open6 stove (checked before and after, put back
+# stove build of this folder puts the newest aros-stuff patch (pthreads) into
+# that machine's default stove (see ../install-stove.sh) (checked before and after, put back
 # on any failure). Task 44, 10 November 2026: "a stove refresh by the #45/#46
 # method".
 set -eu
