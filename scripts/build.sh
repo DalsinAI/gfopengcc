@@ -230,6 +230,11 @@ for f in \
   [ -s "$f" ] || { echo "libnix4 did not produce $f"; exit 1; }
 done
 cp "$WORK/build-Linux-m68k-amigaos/libnix/libb/libnix4.a" "$PREFIX/m68k-amigaos/libnix/lib/libb/"
+# std::stoll, std::stoull and std::stold for std::string: libnix has strtoll,
+# strtoull and strtold, but libstdc++'s configure leaves its C99 stdlib off in
+# some multilibs (libm040/libm881). After 6b: its make installs libgcc and
+# libstdc++ again (log/install libgcc.log), which puts every c++config.h back.
+LOG="$LOGS/libstdcxx-c99-stdlib.log" sh "$HERE/scripts/libstdcxx-c99-stdlib.sh" "$PREFIX"
 
 # 6c. Stack-protector support is absent from libnix. Install the small Open7
 #     runtime into every advertised multilib before exercising the driver.
@@ -241,7 +246,7 @@ say checks
 CC="$PREFIX/bin/m68k-amigaos-gcc"
 C=$LOGS/check; mkdir -p "$C"
 # The identity patches/amiga-gcc/0002 gives it (tests/release-names.sh keeps them in step).
-ID="GFOpenAmigaGCC 16.2.0-open8"
+ID="GFOpenAmigaGCC 16.2.0-open9"
 "$CC" --version | sed -n '1p' | grep -F "($ID)" > /dev/null || {
   echo "gcc does not identify itself as $ID"; exit 1;
 }

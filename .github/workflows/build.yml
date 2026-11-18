@@ -15,6 +15,14 @@ on:
         description: 'Publish this build as a release, e.g. 16.2.0-open7 (needs docs/releases/<version>.md); empty builds only'
         required: false
         default: ''
+      rc:
+        description: 'With release: publish it as release candidate N, a pre-release tagged v<release>-rcN (e.g. 1); empty publishes the release itself'
+        required: false
+        default: ''
+      aarch64_rc:
+        description: 'Build only the aarch64-linux-gnu kernel compiler and publish it as pre-release N, tagged v<version>-aarch64-rcN (e.g. 1); empty builds every target'
+        required: false
+        default: ''
 
 concurrency:
   group: build-${{ github.ref }}
@@ -25,6 +33,7 @@ concurrency:
 # that runs none of them.
 jobs:
   build:
+    if: inputs.aarch64_rc == ''
     runs-on: ubuntu-24.04
     timeout-minutes: 300
     permissions:
@@ -49,8 +58,11 @@ jobs:
             libgmp-dev libmpfr-dev libmpc-dev rsync git lhasa autoconf gettext \
             libncurses-dev libreadline-dev qemu-user python3
 
+      - name: The release names check refuses what it should
+        run: tests/release-names-test.sh
+
       - name: Release names agree
-        run: tests/release-names.sh ${{ inputs.release }}
+        run: tests/release-names.sh "${{ inputs.release }}" "${{ inputs.rc }}"
 
       - name: Compiler output readers drain their input
         run: python3 tests/compiler-output.py
@@ -119,6 +131,10 @@ jobs:
           "$PREFIX/bin/m68k-amigaos-gcc" -m68040 -m68881 -O2 -o "$O/setlocale_threads" tests/libnix/setlocale_threads.c -lpthread -lm
           "$PREFIX/bin/m68k-amigaos-gcc" -m68040 -O2 -noixemul -o "$O/foreigntls" tests/pthreads/foreigntls.c -lpthread
           "$PREFIX/bin/m68k-amigaos-gcc" -m68040 -O2 -Wall -Werror -noixemul -o "$O/condsignal" tests/pthreads/condsignal.c -lpthread
+          # std::stoll, std::stoull, std::stold (#51): the release needs the C99 stdlib on, so a build where
+          # scripts/libstdcxx-c99-stdlib.sh turned it back off fails here; linked, as a port links it
+          $CXX $FL -o "$O/stoll" tests/cxx/stoll.cpp -lpthread
+          $CXX -m68040 -O2 -std=gnu++11 -o "$O/stoll-soft" tests/cxx/stoll.cpp -lpthread
           "$PREFIX/bin/m68k-amigaos-gcc" -m68040 -m68881 -O2 -o "$O/strtol_endptr" tests/libnix/strtol_endptr.c
           ls -l "$O"
 
@@ -152,6 +168,7 @@ jobs:
   # collect-aros are built and the code checks compile and assemble only; the
   # stove build on the Cradle machine adds libgcc, libstdc++ and libatomic.
   aros:
+    if: inputs.aarch64_rc == ''
     runs-on: ubuntu-24.04
     timeout-minutes: 150
     permissions:
@@ -183,6 +200,86 @@ jobs:
           name: aros-logs
           path: ${{ runner.temp }}/work/aros/logs
 
+  # The aarch64-linux-gnu kernel compiler (from open9): stock GCC 16.2.0 and
+  # binutils 2.47 with patches/aarch64/series, C and libgcc only.
+  aarch64:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Host tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq build-essential bison flex texinfo libgmp-dev libmpfr-dev libmpc-dev rsync curl qemu-user python3
+
+      - name: The aarch64 recipe check refuses what it should
+        run: tests/aarch64-recipe-test.sh
+
+      - name: Fetch the aarch64-linux-gnu sources
+        run: scripts/fetch-aarch64.sh "$RUNNER_TEMP/work"
+
+      - name: Build aarch64-linux-gnu-gcc (checks included)
+        run: scripts/build-aarch64.sh "$RUNNER_TEMP/work" "$RUNNER_TEMP/aarch64" "$(nproc)"
+
+      - name: Package
+        if: inputs.aarch64_rc != ''
+        run: |
+          V=$(sed -n 's/^ID="GFOpenAmigaGCC \(.*\)"$/\1/p' scripts/build-aarch64.sh)
+          test -f "docs/releases/$V-aarch64.md"
+          echo "V=$V" >> "$GITHUB_ENV"
+          scripts/package-aarch64.sh "$RUNNER_TEMP/work" "$RUNNER_TEMP/aarch64" "$RUNNER_TEMP/out" "$V"
+          echo "$V" > "$RUNNER_TEMP/out/VERSION"
+          ls -l "$RUNNER_TEMP/out"
+
+      - name: Keep the release files for the release job
+        if: inputs.aarch64_rc != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-aarch64
+          path: ${{ runner.temp }}/out/
+          retention-days: 1
+          if-no-files-found: error
+
+      - name: Logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: aarch64-logs
+          path: ${{ runner.temp }}/work/aarch64/logs
+
+  aarch64-release:
+    needs: [aarch64]
+    if: inputs.aarch64_rc != ''
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-aarch64
+          path: ${{ runner.temp }}/out
+
+      - name: Publish the pre-release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RC: ${{ inputs.aarch64_rc }}
+        run: |
+          [[ $RC =~ ^[1-9][0-9]*$ ]] || { echo "aarch64_rc \"$RC\" is not a number from 1"; exit 1; }
+          V=$(cat "$RUNNER_TEMP/out/VERSION")
+          cd "$RUNNER_TEMP/out" && sha256sum -c SHA256SUMS-aarch64 && cd "$GITHUB_WORKSPACE"
+          gh release create "v$V-aarch64-rc$RC" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --prerelease \
+            --title "GFOpenAmigaGCC $V for aarch64-linux-gnu RC$RC" --notes-file "docs/releases/$V-aarch64.md" \
+            "$RUNNER_TEMP/out/gfopenamigagcc-$V-aarch64-linux-gnu-x86_64-linux.tar.xz" \
+            "$RUNNER_TEMP/out/gfopenamigagcc-$V-aarch64-linux-gnu-src.tar" "$RUNNER_TEMP/out/SHA256SUMS-aarch64"
+
   release:
     needs: [build, aros]
     if: inputs.release != ''
@@ -204,9 +301,14 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           V: ${{ inputs.release }}
+          RC: ${{ inputs.rc }}
         run: |
           cd "$RUNNER_TEMP/out" && sha256sum -c SHA256SUMS && cd "$GITHUB_WORKSPACE"
-          gh release create "v$V" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
-            --title "GFOpenAmigaGCC $V" --notes-file "docs/releases/$V.md" \
+          # A release candidate is a pre-release of the same build: tag v$V-rcN, the files keep the
+          # release's names (the compiler says $V), so the release itself can be the same bytes.
+          TAG="v$V"; TITLE="GFOpenAmigaGCC $V"; PRE=()
+          if [ -n "$RC" ]; then TAG="v$V-rc$RC"; TITLE="GFOpenAmigaGCC $V RC$RC"; PRE=(--prerelease); fi
+          gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" "${PRE[@]}" \
+            --title "$TITLE" --notes-file "docs/releases/$V.md" \
             "$RUNNER_TEMP/out/gfopenamigagcc-$V-x86_64-linux.tar.xz" \
             "$RUNNER_TEMP/out/gfopenamigagcc-$V-src.tar.xz" "$RUNNER_TEMP/out/SHA256SUMS"
