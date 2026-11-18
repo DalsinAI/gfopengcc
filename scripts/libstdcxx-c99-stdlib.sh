@@ -27,8 +27,11 @@ for f in $files; do
 done
 T=$(mktemp -d); trap 'rm -rf "$T"' EXIT
 ok=1
-for std in gnu++23 gnu++11; do
-  "$CXX" -m68040 -O2 -std=$std -c -o "$T/stoll.o" "$HERE/tests/cxx/stoll.cpp" >> "$LOG" 2>&1 || { ok=0; break; }
+# each multilib has its own c++config.h: the 68040 soft-float and FPU ones both
+for fl in "-m68040" "-m68040 -m68881"; do
+  for std in gnu++23 gnu++11; do
+    "$CXX" $fl -O2 -std=$std -c -o "$T/stoll.o" "$HERE/tests/cxx/stoll.cpp" >> "$LOG" 2>&1 || { ok=0; break 2; }
+  done
 done
 for f in $files; do
   if [ $ok = 1 ]; then rm -f "$f.c99-orig"; else mv "$f.c99-orig" "$f"; fi

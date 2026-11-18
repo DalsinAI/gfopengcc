@@ -218,9 +218,6 @@ for f in $(find "$PREFIX/lib/gcc/m68k-amigaos" -path "*include/c++*" -name c++co
     grep -q "define $d 1" "$f" || sed -i "s|^/\* #undef $d \*/|#define $d 1|" "$f"
   done
 done
-# std::stoll, std::stoull and std::stold for std::string: libnix has strtoll,
-# strtoull and strtold, but libstdc++'s configure leaves its C99 stdlib off.
-LOG="$LOGS/libstdcxx-c99-stdlib.log" sh "$HERE/scripts/libstdcxx-c99-stdlib.sh" "$PREFIX"
 
 # 6b. Shared libnix and its static support archive, for -mcrt=library.
 echo done > "$WORK/build-Linux-m68k-amigaos/gcc/_libgcc_done"   # step 6 built and installed them
@@ -233,6 +230,11 @@ for f in \
   [ -s "$f" ] || { echo "libnix4 did not produce $f"; exit 1; }
 done
 cp "$WORK/build-Linux-m68k-amigaos/libnix/libb/libnix4.a" "$PREFIX/m68k-amigaos/libnix/lib/libb/"
+# std::stoll, std::stoull and std::stold for std::string: libnix has strtoll,
+# strtoull and strtold, but libstdc++'s configure leaves its C99 stdlib off in
+# some multilibs (libm040/libm881). After 6b: its make installs libgcc and
+# libstdc++ again (log/install libgcc.log), which puts every c++config.h back.
+LOG="$LOGS/libstdcxx-c99-stdlib.log" sh "$HERE/scripts/libstdcxx-c99-stdlib.sh" "$PREFIX"
 
 # 6c. Stack-protector support is absent from libnix. Install the small Open7
 #     runtime into every advertised multilib before exercising the driver.
