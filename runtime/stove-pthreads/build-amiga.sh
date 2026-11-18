@@ -1,21 +1,23 @@
 #!/bin/sh
 # Copyright (c) 2026 AmiCradle Team. MIT licence (see LICENSE at the repository root).
-# aros-stuff patch 0010 (at exit, pthreads cancels the threads still running
-# and removes any left after 2 s) for a stove that was built before it,
+# The newest aros-stuff patch in patches/aros-stuff (0010: at exit, pthreads
+# cancels the threads still running; 0011: every pthread_cond_signal wakes a
+# thread that is still waiting) for a stove that was built before it,
 # without rebuilding the stove: for each libpthread.a the stove has, pthread.o
 # is rebuilt from the patched source with the flags the stove's was built
 # with. sched.o and semaphore.o stay the stove's own.
 #
-# Before it builds anything patched it rebuilds pthread.c at 0001-0009 the
+# Before it builds anything patched it rebuilds pthread.c at the patches before
+# the newest the
 # same way and checks the code matches the stove's own pthread.o in every
 # multilib, so the new member is made exactly as the stove's was. A stove
 # whose pthread.o already matches the patched build is left alone.
 #
 # Builds and checks only; install-stove.sh puts the result into the stove.
 #   STOVE=<stove folder> OUT=<folder> sh build-amiga.sh
-# Output: OUT/lib/<multilib>/libpthread.a, OUT/tests/ExitCancel (patched
-# library) and OUT/tests/ExitCancel-old (the stove's), from
-# tests/pthreads/exitcancel.c.
+# Output: OUT/lib/<multilib>/libpthread.a, and OUT/tests/ExitCancel and
+# CondSignal (patched library) with ExitCancel-old and CondSignal-old (the
+# stove's), from tests/pthreads/exitcancel.c and condsignal.c.
 set -eu
 HERE=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 ROOT=$(CDPATH= cd -- "$HERE/../.." && pwd)
@@ -26,7 +28,8 @@ CC="$P/bin/m68k-amigaos-gcc"; AR="$P/bin/m68k-amigaos-ar"; OD="$P/bin/m68k-amiga
 LIB="$P/m68k-amigaos/lib"
 echo "built on $(hostname) as $(id -un), stove $STOVE ($("$CC" --version | head -1))"
 OUT=${OUT:-"$HERE/build-amiga"}; rm -rf "$OUT/lib" "$OUT/obj" "$OUT/tests"; mkdir -p "$OUT/lib" "$OUT/tests" "$OUT/obj"
-NEWP=$(ls "$ROOT"/patches/aros-stuff/0010-*.patch)
+NEWP=$(ls "$ROOT"/patches/aros-stuff/[0-9][0-9][0-9][0-9]-*.patch | sort | tail -1)
+NEWN=$(basename "$NEWP" | cut -c1-4)
 
 # aros-stuff's pthreads at the commit the stove was built from
 SRC="$OUT/obj/aros-stuff"
@@ -46,8 +49,9 @@ if [ $got = 0 ]; then
 else
   echo "aros-stuff sources: $URL $SHA"
 fi
-# 0001-0009, as scripts/build.sh applies them (a tree that already has one keeps it)
-for p in "$ROOT"/patches/aros-stuff/000[1-9]-*.patch; do
+# the patches before the newest, as scripts/build.sh applies them (a tree that already has one keeps it)
+for p in $(ls "$ROOT"/patches/aros-stuff/[0-9][0-9][0-9][0-9]-*.patch | sort); do
+  [ "$p" != "$NEWP" ] || continue
   if ( cd "$SRC" && patch -s -p1 --dry-run < "$p" ) >/dev/null 2>&1; then ( cd "$SRC" && patch -s -p1 < "$p" )
   elif ( cd "$SRC" && patch -s -p1 -R --dry-run < "$p" ) >/dev/null 2>&1; then :
   else echo "$(basename "$p") does not apply to the sources; stopping" >&2; exit 1; fi
@@ -82,9 +86,9 @@ for v in ".:" "libb:-fbaserel" "libm020:-m68020" "libb/libm020:-fbaserel -m68020
   "$OD" -d "$w/stove/pthread.o" | tail -n +4 > "$w/a"; "$OD" -d "$w/old/pthread.o" | tail -n +4 > "$w/b"
   "$OD" -d "$w/new/pthread.o" | tail -n +4 > "$w/c"
   if cmp -s "$w/a" "$w/c"; then
-    echo "$d: the stove's pthread.o already has patch 0010, left alone"; n=$((n+1)); continue
+    echo "$d: the stove's pthread.o already has patch $NEWN, left alone"; n=$((n+1)); continue
   fi
-  cmp -s "$w/a" "$w/b" || { echo "$d: pthread.c at 0001-0009 does not rebuild as the stove's pthread.o; stopping" >&2; diff "$w/a" "$w/b" | head -20 >&2; exit 1; }
+  cmp -s "$w/a" "$w/b" || { echo "$d: pthread.c at the patches before $NEWN does not rebuild as the stove's pthread.o; stopping" >&2; diff "$w/a" "$w/b" | head -20 >&2; exit 1; }
   mkdir -p "$OUT/lib/$d"; cp "$LIB/$d/libpthread.a" "$OUT/lib/$d/libpthread.a"
   ( cd "$w/new" && "$AR" r "$OUT/lib/$d/libpthread.a" pthread.o && "$P/bin/m68k-amigaos-ranlib" "$OUT/lib/$d/libpthread.a" )
   o=$("$AR" t "$LIB/$d/libpthread.a" | tr '\n' ' '); nw=$("$AR" t "$OUT/lib/$d/libpthread.a" | tr '\n' ' ')
@@ -98,7 +102,7 @@ done
 for d in libm040 libm040/libm881 libb/libm040 libb/libm040/libm881 libb32/libm040 libb32/libm040/libm881; do
   s=$(echo "$d" | sed 's#libm040.*#libm020#')
   [ -f "$LIB/$d/libpthread.a" ] || continue
-  [ -f "$OUT/lib/$s/libpthread.a" ] || { echo "$d: $s already has patch 0010, left alone"; continue; }
+  [ -f "$OUT/lib/$s/libpthread.a" ] || { echo "$d: $s already has patch $NEWN, left alone"; continue; }
   cmp -s "$LIB/$d/libpthread.a" "$LIB/$s/libpthread.a" || { echo "$d: libpthread.a is not a copy of $s's; stopping" >&2; exit 1; }
   mkdir -p "$OUT/lib/$d"; cp "$OUT/lib/$s/libpthread.a" "$OUT/lib/$d/libpthread.a"
   echo "$d: a copy of $s's, as the stove had it"
@@ -134,4 +138,9 @@ echo "test multilib: $MD (the one a plain -lpthread link uses)"
 "$CC" $CF $EXTRA_CF -o "$OUT/tests/ExitCancel" "$T" "$NEWLIB"
 # shellcheck disable=SC2086
 "$CC" $CF $EXTRA_CF -o "$OUT/tests/ExitCancel-old" "$T" -lpthread
+T2="$ROOT/tests/pthreads/condsignal.c"
+# shellcheck disable=SC2086
+"$CC" $CF $EXTRA_CF -Wall -o "$OUT/tests/CondSignal" "$T2" "$NEWLIB"
+# shellcheck disable=SC2086
+"$CC" $CF $EXTRA_CF -Wall -o "$OUT/tests/CondSignal-old" "$T2" -lpthread
 ( cd "$OUT" && find tests lib -type f | sort | xargs sha256sum )
