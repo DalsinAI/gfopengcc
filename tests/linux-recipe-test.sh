@@ -1,15 +1,15 @@
 #!/bin/bash
-# tests/aarch64-recipe-test.sh: tests/aarch64-recipe.sh passes this checkout and
+# tests/linux-recipe-test.sh: tests/linux-recipe.sh passes this checkout and
 # refuses a series, lock or build script that breaks the recipe's rules.
 # No build, no network. GPL-3.0-or-later. Copyright (c) 2026 AmiCradle Team.
 set -uo pipefail
 HERE=$(cd "$(dirname "$0")/.." && pwd)
-T=$HERE/tests/aarch64-recipe.sh
+T=$HERE/tests/linux-recipe.sh
 D=$(mktemp -d); trap 'rm -rf "$D"' EXIT
 fails=0
 pass() { if out=$(env "$@" "$T" 2>&1); then echo "ok   passes: ${*:-this checkout}"; else echo "FAIL should pass: $* ($out)"; fails=$((fails+1)); fi; }
 refuse() { local why=$1; shift; if out=$(env "$@" "$T" 2>&1); then echo "FAIL should refuse: $why ($out)"; fails=$((fails+1)); else echo "ok   refuses: $why ($out)"; fi; }
-S=$HERE/patches/aarch64/series; L=$HERE/scripts/aarch64.lock; B=$HERE/scripts/build-aarch64.sh
+S=$HERE/patches/linux/series; L=$HERE/scripts/linux.lock; B=$HERE/scripts/build-linux.sh
 pass
 # series
 { cat "$S"; echo "gcc       gcc/0001-amigaos-int32_t-is-int-no-mcrt-means-mcrt-nix20-stov.patch"; } > "$D/amigaos"
@@ -36,6 +36,10 @@ sed 's/^ID=.*/ID="GFOpenAmigaGCC 16.2.0-open8"/' "$B" > "$D/build-id"
 refuse "another identity" BUILD="$D/build-id"
 sed 's/--enable-languages=c /--enable-languages=c,c++ /' "$B" > "$D/build-cxx"
 refuse "C++ too" BUILD="$D/build-cxx"
-sed 's/^T=aarch64-linux-gnu$/T=aarch64-elf/' "$B" > "$D/build-target"
-refuse "another target" BUILD="$D/build-target"
-[ $fails -eq 0 ] && echo "aarch64-recipe-test: all passed" || { echo "aarch64-recipe-test: $fails failed"; exit 1; }
+sed 's/T=aarch64-linux-gnu; CT=\$T/T=aarch64-elf; CT=$T/' "$B" > "$D/build-target"
+refuse "another aarch64 target" BUILD="$D/build-target"
+sed 's/CT=x86_64-gfopen-linux-gnu/CT=$T/' "$B" > "$D/build-x86"
+refuse "x86_64 built as a native compiler" BUILD="$D/build-x86"
+grep -v '^  powerpc)' "$B" > "$D/build-ppc"
+refuse "no powerpc" BUILD="$D/build-ppc"
+[ $fails -eq 0 ] && echo "linux-recipe-test: all passed" || { echo "linux-recipe-test: $fails failed"; exit 1; }

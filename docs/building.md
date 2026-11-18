@@ -52,18 +52,19 @@ no network at all, so a missing source stops it.
 Then `tests/repro/prove.sh PREFIX/bin` runs every reproducer (it needs
 `qemu-m68k`).
 
-## The aarch64-linux-gnu target (kernels)
+## The Linux kernel compilers
 
-From open9 the repository also builds `aarch64-linux-gnu-gcc`, a kernel cross
-compiler for the CM4 and Pi 5 cards, from stock GCC 16.2.0 and binutils 2.47
-with fold-mem-offsets (0019) only:
+From open9 the repository also builds kernel cross compilers for
+aarch64-linux-gnu (CM4, Pi 5), x86_64-linux-gnu (the AMD appliance) and
+powerpc-linux-gnu (AC460), from stock GCC 16.2.0 and binutils 2.47 with
+fold-mem-offsets (0019) only:
 
 ```bash
-scripts/fetch-aarch64.sh WORK [TARBALLS]
-scripts/build-aarch64.sh WORK PREFIX [JOBS]
+scripts/fetch-linux.sh WORK [TARBALLS]
+scripts/build-linux.sh WORK PREFIX aarch64|x86_64|powerpc [JOBS]
 ```
 
-See [aarch64.md](aarch64.md).
+See [linux.md](linux.md).
 
 ## The m68k-aros target
 

@@ -20,7 +20,15 @@ on:
         required: false
         default: ''
       aarch64_rc:
-        description: 'Build only the aarch64-linux-gnu kernel compiler and publish it as pre-release N, tagged v<version>-aarch64-rcN (e.g. 1); empty builds every target'
+        description: 'Build only the Linux kernel compilers and publish aarch64-linux-gnu as pre-release N, tagged v<version>-aarch64-rcN (e.g. 1)'
+        required: false
+        default: ''
+      x86_64_rc:
+        description: 'Build only the Linux kernel compilers and publish x86_64-linux-gnu as pre-release N, tagged v<version>-x86_64-rcN'
+        required: false
+        default: ''
+      powerpc_rc:
+        description: 'Build only the Linux kernel compilers and publish powerpc-linux-gnu as pre-release N, tagged v<version>-powerpc-rcN'
         required: false
         default: ''
 
@@ -33,7 +41,7 @@ concurrency:
 # that runs none of them.
 jobs:
   build:
-    if: inputs.aarch64_rc == ''
+    if: inputs.aarch64_rc == '' && inputs.x86_64_rc == '' && inputs.powerpc_rc == ''
     runs-on: ubuntu-24.04
     timeout-minutes: 300
     permissions:
@@ -168,7 +176,7 @@ jobs:
   # collect-aros are built and the code checks compile and assemble only; the
   # stove build on the Cradle machine adds libgcc, libstdc++ and libatomic.
   aros:
-    if: inputs.aarch64_rc == ''
+    if: inputs.aarch64_rc == '' && inputs.x86_64_rc == '' && inputs.powerpc_rc == ''
     runs-on: ubuntu-24.04
     timeout-minutes: 150
     permissions:
@@ -200,13 +208,20 @@ jobs:
           name: aros-logs
           path: ${{ runner.temp }}/work/aros/logs
 
-  # The aarch64-linux-gnu kernel compiler (from open9): stock GCC 16.2.0 and
-  # binutils 2.47 with patches/aarch64/series, C and libgcc only.
-  aarch64:
+  # The Linux kernel compilers (from open9): stock GCC 16.2.0 and binutils 2.47
+  # with patches/linux/series, C and libgcc only, one per architecture.
+  linux:
     runs-on: ubuntu-24.04
     timeout-minutes: 120
     permissions:
       contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [aarch64, x86_64, powerpc]
+    env:
+      ARCH: ${{ matrix.arch }}
+      RC: ${{ inputs[format('{0}_rc', matrix.arch)] }}
     steps:
       - uses: actions/checkout@v4
 
@@ -215,30 +230,29 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y -qq build-essential bison flex texinfo libgmp-dev libmpfr-dev libmpc-dev rsync curl qemu-user python3
 
-      - name: The aarch64 recipe check refuses what it should
-        run: tests/aarch64-recipe-test.sh
+      - name: The Linux recipe check refuses what it should
+        run: tests/linux-recipe-test.sh
 
-      - name: Fetch the aarch64-linux-gnu sources
-        run: scripts/fetch-aarch64.sh "$RUNNER_TEMP/work"
+      - name: Fetch the sources
+        run: scripts/fetch-linux.sh "$RUNNER_TEMP/work"
 
-      - name: Build aarch64-linux-gnu-gcc (checks included)
-        run: scripts/build-aarch64.sh "$RUNNER_TEMP/work" "$RUNNER_TEMP/aarch64" "$(nproc)"
+      - name: Build ${{ matrix.arch }}-linux-gnu-gcc (checks included)
+        run: scripts/build-linux.sh "$RUNNER_TEMP/work" "$RUNNER_TEMP/linux" "$ARCH" "$(nproc)"
 
       - name: Package
-        if: inputs.aarch64_rc != ''
+        if: env.RC != ''
         run: |
-          V=$(sed -n 's/^ID="GFOpenAmigaGCC \(.*\)"$/\1/p' scripts/build-aarch64.sh)
-          test -f "docs/releases/$V-aarch64.md"
-          echo "V=$V" >> "$GITHUB_ENV"
-          scripts/package-aarch64.sh "$RUNNER_TEMP/work" "$RUNNER_TEMP/aarch64" "$RUNNER_TEMP/out" "$V"
+          V=$(sed -n 's/^ID="GFOpenAmigaGCC \(.*\)"$/\1/p' scripts/build-linux.sh)
+          test -f "docs/releases/$V-$ARCH.md"
+          scripts/package-linux.sh "$RUNNER_TEMP/work" "$RUNNER_TEMP/linux" "$RUNNER_TEMP/out" "$V" "$ARCH"
           echo "$V" > "$RUNNER_TEMP/out/VERSION"
           ls -l "$RUNNER_TEMP/out"
 
       - name: Keep the release files for the release job
-        if: inputs.aarch64_rc != ''
+        if: env.RC != ''
         uses: actions/upload-artifact@v4
         with:
-          name: release-aarch64
+          name: release-${{ matrix.arch }}
           path: ${{ runner.temp }}/out/
           retention-days: 1
           if-no-files-found: error
@@ -247,38 +261,47 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: aarch64-logs
-          path: ${{ runner.temp }}/work/aarch64/logs
+          name: linux-${{ matrix.arch }}-logs
+          path: ${{ runner.temp }}/work/linux/logs-${{ matrix.arch }}
 
-  aarch64-release:
-    needs: [aarch64]
-    if: inputs.aarch64_rc != ''
+  linux-release:
+    needs: [linux]
+    if: inputs.aarch64_rc != '' || inputs.x86_64_rc != '' || inputs.powerpc_rc != ''
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
       contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [aarch64, x86_64, powerpc]
+    env:
+      ARCH: ${{ matrix.arch }}
+      RC: ${{ inputs[format('{0}_rc', matrix.arch)] }}
     steps:
       - uses: actions/checkout@v4
+        if: env.RC != ''
         with:
           persist-credentials: false
 
       - uses: actions/download-artifact@v4
+        if: env.RC != ''
         with:
-          name: release-aarch64
+          name: release-${{ matrix.arch }}
           path: ${{ runner.temp }}/out
 
       - name: Publish the pre-release
+        if: env.RC != ''
         env:
           GH_TOKEN: ${{ github.token }}
-          RC: ${{ inputs.aarch64_rc }}
         run: |
-          [[ $RC =~ ^[1-9][0-9]*$ ]] || { echo "aarch64_rc \"$RC\" is not a number from 1"; exit 1; }
+          [[ $RC =~ ^[1-9][0-9]*$ ]] || { echo "${ARCH}_rc \"$RC\" is not a number from 1"; exit 1; }
           V=$(cat "$RUNNER_TEMP/out/VERSION")
-          cd "$RUNNER_TEMP/out" && sha256sum -c SHA256SUMS-aarch64 && cd "$GITHUB_WORKSPACE"
-          gh release create "v$V-aarch64-rc$RC" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --prerelease \
-            --title "GFOpenAmigaGCC $V for aarch64-linux-gnu RC$RC" --notes-file "docs/releases/$V-aarch64.md" \
-            "$RUNNER_TEMP/out/gfopenamigagcc-$V-aarch64-linux-gnu-x86_64-linux.tar.xz" \
-            "$RUNNER_TEMP/out/gfopenamigagcc-$V-aarch64-linux-gnu-src.tar" "$RUNNER_TEMP/out/SHA256SUMS-aarch64"
+          cd "$RUNNER_TEMP/out" && sha256sum -c "SHA256SUMS-$ARCH" && cd "$GITHUB_WORKSPACE"
+          gh release create "v$V-$ARCH-rc$RC" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --prerelease \
+            --title "GFOpenAmigaGCC $V for $ARCH-linux-gnu RC$RC" --notes-file "docs/releases/$V-$ARCH.md" \
+            "$RUNNER_TEMP/out/gfopenamigagcc-$V-$ARCH-linux-gnu-x86_64-linux.tar.xz" \
+            "$RUNNER_TEMP/out/gfopenamigagcc-$V-$ARCH-linux-gnu-src.tar" "$RUNNER_TEMP/out/SHA256SUMS-$ARCH"
 
   release:
     needs: [build, aros]

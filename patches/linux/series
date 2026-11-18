@@ -1,5 +1,5 @@
-# The aarch64-linux-gnu target's patch series, applied in this order by
-# scripts/build-aarch64.sh to stock GCC 16.2.0 and binutils 2.47.
+# The Linux kernel compilers' patch series (aarch64, x86_64, powerpc), applied
+# in this order by scripts/build-linux.sh to stock GCC 16.2.0 and binutils 2.47.
 # One line per patch: the source tree it goes into (gcc or binutils), then its
 # path under patches/. Lines starting with "#" are notes.
 #
@@ -7,6 +7,6 @@
 # target-independent pass, so it goes in. The AmigaOS driver, libnix,
 # pthreads (aros-stuff) and libstdc++ patches stay out; the identity
 # (GFOpenAmigaGCC 16.2.0-openN) is given by --with-pkgversion, as for m68k-aros.
-# tests/aarch64-recipe.sh checks every patch here is one the stock-GCC m68k-aros
+# tests/linux-recipe.sh checks every patch here is one the stock-GCC m68k-aros
 # series applies too, and that it is no m68k or AmigaOS patch.
 gcc       gcc/0019-fold-mem-offsets-a-memory-to-memory-move-is-no-root.patch

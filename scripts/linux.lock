@@ -1,4 +1,4 @@
-# GFOpenAmigaGCC's aarch64-linux-gnu target (a Linux kernel compiler): name  url  sha256  file under WORK/aarch64
-# The same GNU releases as the m68k-aros target (scripts/aros.lock); tests/aarch64-recipe.sh keeps the pins equal.
+# GFOpenAmigaGCC's Linux kernel compilers (aarch64, x86_64, powerpc; scripts/build-linux.sh): name  url  sha256  file under WORK/linux
+# The same GNU releases as the m68k-aros target (scripts/aros.lock); tests/linux-recipe.sh keeps the pins equal.
 gcc       https://ftp.gnu.org/gnu/gcc/gcc-16.2.0/gcc-16.2.0.tar.xz        e6738e29597f733270731aa90600f37ffdc045079dfc27ec7e8192cc81085c3e  gcc-16.2.0.tar.xz
 binutils  https://ftp.gnu.org/gnu/binutils/binutils-2.47.tar.bz2          3068128c75cda9f898ccb4211d360246e8e195ffcc9dfb655b23ae23a54800e8  binutils-2.47.tar.bz2
