@@ -7,6 +7,9 @@
  *     pthread_cond_signal is called once. The second waiter must wake, and the first
  *     must get ETIMEDOUT.
  *   broadcast:   three threads wait, three things arrive, one pthread_cond_broadcast.
+ *   destroy:     the same on a condition of its own, and pthread_cond_destroy straight
+ *     after the broadcast, before any waiter has run. It must return 0 and all three
+ *     must still wake.
  * Prints PASS or FAIL per case and "condsignal OK" (rc 0) or "condsignal FAILED" (rc 20).
  *
  *   m68k-amigaos-gcc -m68040 -O2 -Wall -noixemul -o condsignal condsignal.c -lpthread
@@ -20,6 +23,7 @@
 
 static pthread_mutex_t mtx = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
+static pthread_cond_t *cur = &cond;   /* the condition the takers wait on */
 static int ready;       /* threads that hold the mutex and are about to wait, or wait */
 static int things;      /* what the waiters wait for */
 static int done;        /* waiters that took a thing */
@@ -38,7 +42,7 @@ static void *taker(void *arg)
     (void)arg;
     pthread_mutex_lock(&mtx);
     ready++;
-    while (!things) pthread_cond_wait(&cond, &mtx);
+    while (!things) pthread_cond_wait(cur, &mtx);
     things--;
     done++;
     pthread_mutex_unlock(&mtx);
@@ -159,11 +163,39 @@ static void broadcast(void)
     for (i = 0; i < n; i++) pthread_join(t[i], NULL);
 }
 
+/* A failed wake here leaves threads in a wait nothing can end, so they are not joined:
+ * exit removes them. */
+static void destroy(void)
+{
+    static pthread_cond_t own;
+    pthread_t t[3];
+    int i, d, rc, n = 0;
+    reset();
+    if (pthread_cond_init(&own, NULL)) { check(0, "destroy", "pthread_cond_init"); return; }
+    cur = &own;
+    for (i = 0; i < 3; i++) {
+        if (pthread_create(&t[i], NULL, taker, NULL)) break;
+        n++;
+        wait_ready(n);
+    }
+    pthread_mutex_lock(&mtx);
+    things = n;
+    pthread_cond_broadcast(&own);
+    rc = pthread_cond_destroy(&own);
+    pthread_mutex_unlock(&mtx);
+    d = wait_done(n);
+    check(rc == 0, "destroy", "pthread_cond_destroy straight after a broadcast returns 0");
+    check(n == 3 && d == 3, "destroy", "the three waiters still wake");
+    if (d == n) for (i = 0; i < n; i++) pthread_join(t[i], NULL);
+    cur = &cond;
+}
+
 int main(void)
 {
     two_signals();
     timed_out();
     broadcast();
+    destroy();
     puts(fails ? "condsignal FAILED" : "condsignal OK");
     return fails ? 20 : 0;
 }
