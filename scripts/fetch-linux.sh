@@ -1,16 +1,16 @@
 #!/bin/bash
-# fetch-aarch64.sh WORK [MIRROR]
-# Puts the aarch64-linux-gnu target's sources (scripts/aarch64.lock) in
-# WORK/aarch64: the GCC and binutils tarballs, each checked against its SHA-256.
+# fetch-linux.sh WORK [MIRROR]
+# Puts the Linux kernel compilers' sources (scripts/linux.lock) in
+# WORK/linux: the GCC and binutils tarballs, each checked against its SHA-256.
 # With MIRROR (a folder holding the tarballs, such as WORK/aros of an m68k-aros
 # fetch), a tarball found there with the right SHA-256 is copied instead.
 # GPL-3.0-or-later, like the patches it goes with. Copyright (c) 2026 AmiCradle Team.
 set -euo pipefail
 WORK=$1; MIRROR=${2:-}
 HERE=$(cd "$(dirname "$0")" && pwd)
-A=$WORK/aarch64; mkdir -p "$A"
+A=$WORK/linux; mkdir -p "$A"
 sha() { sha256sum "$1" | cut -d' ' -f1; }
-grep -v '^#' "$HERE/aarch64.lock" | while read -r name url pin dest; do
+grep -v '^#' "$HERE/linux.lock" | while read -r name url pin dest; do
   [ -n "$name" ] || continue
   f=$A/$dest
   if [ -f "$f" ] && [ "$(sha "$f")" = "$pin" ]; then echo "$name: already in $f"; continue; fi

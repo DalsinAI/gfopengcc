@@ -1,6 +1,6 @@
 /* A freestanding aarch64 Linux program, built as the kernel builds its code
    (no C library, general registers only): it writes "aarch64 ok" with the
-   write system call and exits 0. tests/aarch64-check.sh runs it under
+   write system call and exits 0. tests/linux-check.sh runs it under
    qemu-aarch64. The copy goes through a struct and a byte loop so -O2's
    fold-mem-offsets pass (GCC 0019) has base-plus-offset stores to fold.
    MIT licence, Copyright (c) 2026 AmiCradle Team. */

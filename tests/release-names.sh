@@ -28,8 +28,8 @@ v=${BASH_REMATCH[1]}; n=${BASH_REMATCH[2]}
 grep -qxF "ID=\"$pkg\"" "$HERE/scripts/build.sh" || fail "scripts/build.sh does not check for ($pkg)"
 # from open6 the m68k-aros GCC (scripts/build-aros.sh) carries the same identity
 grep -qxF "ID=\"$pkg\"" "$HERE/scripts/build-aros.sh" || fail "scripts/build-aros.sh does not build ($pkg)"
-# from open9 the aarch64-linux-gnu kernel compiler (scripts/build-aarch64.sh) too
-grep -qxF "ID=\"$pkg\"" "$HERE/scripts/build-aarch64.sh" || fail "scripts/build-aarch64.sh does not build ($pkg)"
+# from open9 the Linux kernel compilers (scripts/build-linux.sh) too
+grep -qxF "ID=\"$pkg\"" "$HERE/scripts/build-linux.sh" || fail "scripts/build-linux.sh does not build ($pkg)"
 grep -qF 'BIN=gfopenamigagcc-$V-x86_64-linux; SRC=gfopenamigagcc-$V-src' "$HERE/scripts/package.sh" || fail "scripts/package.sh does not name the tarballs gfopenamigagcc-*"
 for f in 'gfopenamigagcc-$V-x86_64-linux.tar.xz' 'gfopenamigagcc-$V-src.tar.xz'; do
   grep -qF "\$RUNNER_TEMP/out/$f" "$HERE/.github/workflows/build.yml" || fail "the build workflow does not publish $f"
