@@ -31,6 +31,14 @@ on:
         description: 'Build only the Linux kernel compilers and publish powerpc-linux-gnu as pre-release N, tagged v<version>-powerpc-rcN'
         required: false
         default: ''
+      x86_64_glibc_rc:
+        description: 'Build only the Linux userland compilers and publish x86_64-linux-gnu over glibc 2.35 as pre-release N, tagged v<version>-x86_64-glibc-rcN'
+        required: false
+        default: ''
+      aarch64_glibc_rc:
+        description: 'Build only the Linux userland compilers and publish aarch64-linux-gnu over glibc 2.35 as pre-release N, tagged v<version>-aarch64-glibc-rcN'
+        required: false
+        default: ''
 
 concurrency:
   group: build-${{ github.ref }}
@@ -41,7 +49,7 @@ concurrency:
 # that runs none of them.
 jobs:
   build:
-    if: inputs.aarch64_rc == '' && inputs.x86_64_rc == '' && inputs.powerpc_rc == ''
+    if: inputs.aarch64_rc == '' && inputs.x86_64_rc == '' && inputs.powerpc_rc == '' && inputs.x86_64_glibc_rc == '' && inputs.aarch64_glibc_rc == ''
     runs-on: ubuntu-24.04
     timeout-minutes: 300
     permissions:
@@ -176,7 +184,7 @@ jobs:
   # collect-aros are built and the code checks compile and assemble only; the
   # stove build on the Cradle machine adds libgcc, libstdc++ and libatomic.
   aros:
-    if: inputs.aarch64_rc == '' && inputs.x86_64_rc == '' && inputs.powerpc_rc == ''
+    if: inputs.aarch64_rc == '' && inputs.x86_64_rc == '' && inputs.powerpc_rc == '' && inputs.x86_64_glibc_rc == '' && inputs.aarch64_glibc_rc == ''
     runs-on: ubuntu-24.04
     timeout-minutes: 150
     permissions:
@@ -211,6 +219,7 @@ jobs:
   # The Linux kernel compilers (from open9): stock GCC 16.2.0 and binutils 2.47
   # with patches/linux/series, C and libgcc only, one per architecture.
   linux:
+    if: inputs.x86_64_glibc_rc == '' && inputs.aarch64_glibc_rc == ''
     runs-on: ubuntu-24.04
     timeout-minutes: 120
     permissions:
@@ -302,6 +311,103 @@ jobs:
             --title "GFOpenAmigaGCC $V for $ARCH-linux-gnu RC$RC" --notes-file "docs/releases/$V-$ARCH.md" \
             "$RUNNER_TEMP/out/gfopenamigagcc-$V-$ARCH-linux-gnu-x86_64-linux.tar.xz" \
             "$RUNNER_TEMP/out/gfopenamigagcc-$V-$ARCH-linux-gnu-src.tar" "$RUNNER_TEMP/out/SHA256SUMS-$ARCH"
+
+  # The Linux userland compilers (from open9): stock GCC 16.2.0 and binutils 2.47
+  # with patches/linux/series, C and C++, over a glibc 2.35 and Linux 5.15 sysroot,
+  # for the native runtimes AmiCradle builds (gfosmotherboards ci/build_runtimes.py).
+  userland:
+    if: inputs.aarch64_rc == '' && inputs.x86_64_rc == '' && inputs.powerpc_rc == ''
+    runs-on: ubuntu-24.04
+    timeout-minutes: 240
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [x86_64, aarch64]
+    env:
+      ARCH: ${{ matrix.arch }}
+      RC: ${{ inputs[format('{0}_glibc_rc', matrix.arch)] }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Host tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq build-essential bison flex texinfo gawk rsync libgmp-dev libmpfr-dev libmpc-dev curl qemu-user python3
+
+      - name: The userland recipe check refuses what it should
+        run: tests/userland-recipe-test.sh
+
+      - name: Fetch the sources
+        run: scripts/fetch-userland.sh "$RUNNER_TEMP/work"
+
+      - name: Build ${{ matrix.arch }}-linux-gnu-gcc and g++ over glibc 2.35 (checks included)
+        run: scripts/build-userland.sh "$RUNNER_TEMP/work" "$RUNNER_TEMP/userland" "$ARCH" "$(nproc)"
+
+      - name: Package
+        if: env.RC != ''
+        run: |
+          V=$(sed -n 's/^ID="GFOpenAmigaGCC \(.*\)"$/\1/p' scripts/build-userland.sh)
+          test -f "docs/releases/$V-$ARCH-glibc.md"
+          scripts/package-userland.sh "$RUNNER_TEMP/work" "$RUNNER_TEMP/userland" "$RUNNER_TEMP/out" "$V" "$ARCH"
+          echo "$V" > "$RUNNER_TEMP/out/VERSION"
+          ls -l "$RUNNER_TEMP/out"
+
+      - name: Keep the release files for the release job
+        if: env.RC != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ matrix.arch }}-glibc
+          path: ${{ runner.temp }}/out/
+          retention-days: 1
+          if-no-files-found: error
+
+      - name: Logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: userland-${{ matrix.arch }}-logs
+          path: ${{ runner.temp }}/work/userland/logs-${{ matrix.arch }}
+
+  userland-release:
+    needs: [userland]
+    if: inputs.x86_64_glibc_rc != '' || inputs.aarch64_glibc_rc != ''
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [x86_64, aarch64]
+    env:
+      ARCH: ${{ matrix.arch }}
+      RC: ${{ inputs[format('{0}_glibc_rc', matrix.arch)] }}
+    steps:
+      - uses: actions/checkout@v4
+        if: env.RC != ''
+        with:
+          persist-credentials: false
+
+      - uses: actions/download-artifact@v4
+        if: env.RC != ''
+        with:
+          name: release-${{ matrix.arch }}-glibc
+          path: ${{ runner.temp }}/out
+
+      - name: Publish the pre-release
+        if: env.RC != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          [[ $RC =~ ^[1-9][0-9]*$ ]] || { echo "${ARCH}_glibc_rc \"$RC\" is not a number from 1"; exit 1; }
+          V=$(cat "$RUNNER_TEMP/out/VERSION")
+          cd "$RUNNER_TEMP/out" && sha256sum -c "SHA256SUMS-$ARCH-glibc" && cd "$GITHUB_WORKSPACE"
+          gh release create "v$V-$ARCH-glibc-rc$RC" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --prerelease \
+            --title "GFOpenAmigaGCC $V for $ARCH-linux-gnu, glibc 2.35, RC$RC" --notes-file "docs/releases/$V-$ARCH-glibc.md" \
+            "$RUNNER_TEMP/out/gfopenamigagcc-$V-$ARCH-linux-gnu-glibc2.35-x86_64-linux.tar.xz" \
+            "$RUNNER_TEMP/out/gfopenamigagcc-$V-$ARCH-linux-gnu-glibc2.35-src.tar" "$RUNNER_TEMP/out/SHA256SUMS-$ARCH-glibc"
 
   release:
     needs: [build, aros]
