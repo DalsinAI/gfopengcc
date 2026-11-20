@@ -55,6 +55,8 @@ jobs:
     permissions:
       contents: read
     steps:
+      - name: gh (bigguy's runners don't have it)
+        run: command -v gh >/dev/null || { S=$([ "$(id -u)" = 0 ] || echo sudo); $S apt-get update -q && $S apt-get install -y -q gh; }
       - uses: actions/checkout@v4
 
       - name: Room for the release tarballs
@@ -190,6 +192,8 @@ jobs:
     permissions:
       contents: read
     steps:
+      - name: gh (bigguy's runners don't have it)
+        run: command -v gh >/dev/null || { S=$([ "$(id -u)" = 0 ] || echo sudo); $S apt-get update -q && $S apt-get install -y -q gh; }
       - uses: actions/checkout@v4
 
       - name: Host tools
@@ -232,6 +236,8 @@ jobs:
       ARCH: ${{ matrix.arch }}
       RC: ${{ inputs[format('{0}_rc', matrix.arch)] }}
     steps:
+      - name: gh (bigguy's runners don't have it)
+        run: command -v gh >/dev/null || { S=$([ "$(id -u)" = 0 ] || echo sudo); $S apt-get update -q && $S apt-get install -y -q gh; }
       - uses: actions/checkout@v4
 
       - name: Host tools
@@ -288,6 +294,8 @@ jobs:
       ARCH: ${{ matrix.arch }}
       RC: ${{ inputs[format('{0}_rc', matrix.arch)] }}
     steps:
+      - name: gh (bigguy's runners don't have it)
+        run: command -v gh >/dev/null || { S=$([ "$(id -u)" = 0 ] || echo sudo); $S apt-get update -q && $S apt-get install -y -q gh; }
       - uses: actions/checkout@v4
         if: env.RC != ''
         with:
@@ -329,6 +337,8 @@ jobs:
       ARCH: ${{ matrix.arch }}
       RC: ${{ inputs[format('{0}_glibc_rc', matrix.arch)] }}
     steps:
+      - name: gh (bigguy's runners don't have it)
+        run: command -v gh >/dev/null || { S=$([ "$(id -u)" = 0 ] || echo sudo); $S apt-get update -q && $S apt-get install -y -q gh; }
       - uses: actions/checkout@v4
 
       - name: Host tools
@@ -387,6 +397,8 @@ jobs:
       ARCH: ${{ matrix.arch }}
       RC: ${{ inputs[format('{0}_glibc_rc', matrix.arch)] }}
     steps:
+      - name: gh (bigguy's runners don't have it)
+        run: command -v gh >/dev/null || { S=$([ "$(id -u)" = 0 ] || echo sudo); $S apt-get update -q && $S apt-get install -y -q gh; }
       - uses: actions/checkout@v4
         if: env.RC != ''
         with:
@@ -419,6 +431,8 @@ jobs:
     permissions:
       contents: write
     steps:
+      - name: gh (bigguy's runners don't have it)
+        run: command -v gh >/dev/null || { S=$([ "$(id -u)" = 0 ] || echo sudo); $S apt-get update -q && $S apt-get install -y -q gh; }
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
