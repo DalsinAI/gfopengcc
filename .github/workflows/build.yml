@@ -50,7 +50,7 @@ concurrency:
 jobs:
   build:
     if: inputs.aarch64_rc == '' && inputs.x86_64_rc == '' && inputs.powerpc_rc == '' && inputs.x86_64_glibc_rc == '' && inputs.aarch64_glibc_rc == ''
-    runs-on: ubuntu-24.04
+    runs-on: [self-hosted, lumavault]
     timeout-minutes: 300
     permissions:
       contents: read
@@ -185,7 +185,7 @@ jobs:
   # stove build on the Cradle machine adds libgcc, libstdc++ and libatomic.
   aros:
     if: inputs.aarch64_rc == '' && inputs.x86_64_rc == '' && inputs.powerpc_rc == '' && inputs.x86_64_glibc_rc == '' && inputs.aarch64_glibc_rc == ''
-    runs-on: ubuntu-24.04
+    runs-on: [self-hosted, lumavault]
     timeout-minutes: 150
     permissions:
       contents: read
@@ -220,7 +220,7 @@ jobs:
   # with patches/linux/series, C and libgcc only, one per architecture.
   linux:
     if: inputs.x86_64_glibc_rc == '' && inputs.aarch64_glibc_rc == ''
-    runs-on: ubuntu-24.04
+    runs-on: [self-hosted, lumavault]
     timeout-minutes: 120
     permissions:
       contents: read
@@ -276,7 +276,7 @@ jobs:
   linux-release:
     needs: [linux]
     if: inputs.aarch64_rc != '' || inputs.x86_64_rc != '' || inputs.powerpc_rc != ''
-    runs-on: ubuntu-24.04
+    runs-on: [self-hosted, lumavault]
     timeout-minutes: 30
     permissions:
       contents: write
@@ -317,7 +317,7 @@ jobs:
   # for the native runtimes AmiCradle builds (gfosmotherboards ci/build_runtimes.py).
   userland:
     if: inputs.aarch64_rc == '' && inputs.x86_64_rc == '' && inputs.powerpc_rc == ''
-    runs-on: ubuntu-24.04
+    runs-on: [self-hosted, lumavault]
     timeout-minutes: 240
     permissions:
       contents: read
@@ -375,7 +375,7 @@ jobs:
   userland-release:
     needs: [userland]
     if: inputs.x86_64_glibc_rc != '' || inputs.aarch64_glibc_rc != ''
-    runs-on: ubuntu-24.04
+    runs-on: [self-hosted, lumavault]
     timeout-minutes: 30
     permissions:
       contents: write
@@ -414,7 +414,7 @@ jobs:
   release:
     needs: [build, aros]
     if: inputs.release != ''
-    runs-on: ubuntu-24.04
+    runs-on: [self-hosted, lumavault]
     timeout-minutes: 30
     permissions:
       contents: write
