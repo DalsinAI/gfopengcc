@@ -1,0 +1,37 @@
+pthreads: the fallback signals are cleared before a wait, as meant
+
+When AllocSignal() finds no free signal, pthread_cond_timedwait falls back
+to Ctrl-E for the condition and Ctrl-D for its timer, and clears that bit
+first so a stale one doesn't end the wait at once. It called
+SetSignal(SIGF_..._FALLBACK, 0). exec's SetSignal(newSignals, signalSet)
+changes only the bits in signalSet, so a mask of 0 changed nothing: a
+Ctrl-E or Ctrl-D already pending (the program's own, or one left from an
+earlier fallback wait) woke the wait straight away, as a spurious wakeup,
+or a timed wait as if its time had run out.
+
+Now SetSignal(0, SIGF_..._FALLBACK) clears it, as pthread_join's own
+fallback (0006) already does with SIGF_PARENT. It matters only when the
+task has no free signal bit left.
+
+Test: tests/pthreads/test_fallback_clear.sh.
+
+--- a/pthreads/pthread.c
++++ b/pthreads/pthread.c
+@@ -1099,7 +1099,7 @@
+ 		signal = AllocSignal(-1);
+ 		if (signal == -1) {
+ 			signal = SIGB_TIMER_FALLBACK;
+-			SetSignal(SIGF_TIMER_FALLBACK, 0);
++			SetSignal(0, SIGF_TIMER_FALLBACK);	// clear it: (new, mask) sets only the bits in mask
+ 		}
+ 		timermp.mp_SigBit = signal;
+ 		NEWLIST(&timermp.mp_MsgList);
+@@ -1148,7 +1148,7 @@
+ 	signal = AllocSignal(-1);
+ 	if (signal == -1) {
+ 		signal = SIGB_COND_FALLBACK;
+-		SetSignal(SIGF_COND_FALLBACK, 0);
++		SetSignal(0, SIGF_COND_FALLBACK);	// clear it, as the timer's above
+ 	}
+ 	waiter.sigmask = 1 << signal;
+ 	waiter.signalled = FALSE;
