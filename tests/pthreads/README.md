@@ -73,4 +73,10 @@ It prints PASS or FAIL for each check, then `condsignal OK` (rc 0) or `condsigna
 m68k-amigaos-gcc -m68040 -O2 -Wall -noixemul -o condsignal condsignal.c -lpthread
 ```
 
-With the stove's library (0001-0010) both signals of `two signals` go to the first waiter, and the signal of `timed out` goes to the thread whose wait had run out, so the other thread sleeps on in each: those two checks are expected to fail, and so is `destroy`'s first, because that library answers `EBUSY` while a woken waiter has not yet come back. With 0011 every check should pass.
+With the stove's library (0001-0010) both signals of `two signals` go to the first waiter, and the signal of `timed out` goes to the thread whose wait had run out, so the other thread sleeps on in each; and `destroy`'s first check fails because that library answers `EBUSY` while a woken waiter has not yet come back. So three checks are expected to fail with that library. With 0011 every check should pass.
+
+`test_fallback_clear.sh` (`patches/aros-stuff/0012`, runs on the build machine, no lab): when `AllocSignal` fails, pthreads waits on a fixed fallback signal (`SIGF_TIMER_FALLBACK`, `SIGF_COND_FALLBACK`) and must clear it first. exec's `SetSignal(new, mask)` changes only the bits in `mask`, so the old `SetSignal(SIGF_..._FALLBACK, 0)` cleared nothing and a stale signal could end the wait at once. The script applies the patches to aros-stuff's pthreads (`SRC=<folder holding pthreads/>`, or the open6 source archive) and checks `pthread.c` has no `SetSignal(X, 0)` and clears both with `SetSignal(0, ...)`, then that the tree without 0012 fails the same check.
+
+```bash
+bash tests/pthreads/test_fallback_clear.sh
+```

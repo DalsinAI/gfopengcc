@@ -2,7 +2,8 @@
 # Copyright (c) 2026 AmiCradle Team. MIT licence (see LICENSE at the repository root).
 # The newest aros-stuff patch in patches/aros-stuff (0010: at exit, pthreads
 # cancels the threads still running; 0011: every pthread_cond_signal wakes a
-# thread that is still waiting) for a stove that was built before it,
+# thread that is still waiting; 0012: the fallback signals are cleared before
+# a wait) for a stove that was built before it,
 # without rebuilding the stove: for each libpthread.a the stove has, pthread.o
 # is rebuilt from the patched source with the flags the stove's was built
 # with. sched.o and semaphore.o stay the stove's own.

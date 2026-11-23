@@ -3,8 +3,9 @@
 A patch in `patches/aros-stuff` reaches a new toolchain through
 `scripts/build.sh`. These scripts put the newest one into a stove that was
 built before it (first `0010`: at exit, pthreads cancels the threads still
-running and removes any left after 2 s; now `0011`: every
-`pthread_cond_signal` wakes a thread that is still waiting), without rebuilding the
+running and removes any left after 2 s; then `0011`: every
+`pthread_cond_signal` wakes a thread that is still waiting; now `0012`: the
+fallback signals are cleared before a wait), without rebuilding the
 stove: only `pthread.o` in each `libpthread.a` changes.
 
 - `build-amiga.sh` (`STOVE=... OUT=...`): builds and checks, changes nothing.
