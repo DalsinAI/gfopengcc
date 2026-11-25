@@ -253,6 +253,8 @@ ID="GFOpenAmigaGCC 16.2.0-open9"
 "$HERE/tests/cost-model/check.sh" "$PREFIX/bin"
 "$HERE/tests/hardening/check.sh" "$PREFIX/bin"
 "$HERE/tests/amigaos-multilib.sh" "$PREFIX"
+# No float function a g++ link takes calls itself (libstdc++'s math stubs, gcc 0020).
+"$HERE/tests/selfcalls/check.sh" "$PREFIX"
 link_cpu=$(bash "$HERE/scripts/read-link-cpu.sh" "$CC")
 case "$link_cpu" in
   *'mhard-float|m68881|mcpu=6804'* )

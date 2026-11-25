@@ -1,0 +1,58 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: SacredTrees <121399723+SacredTrees@users.noreply.github.com>
+Date: Wed, 25 Nov 2026 03:13:24 +0000
+Subject: [PATCH] libstdc++: build the float math stubs with -fno-builtin
+
+Where configure finds no floorf, ceilf or sqrtf in the C library (AmigaOS
+with libnix), math_stubs_float.cc defines each as (float) of the double
+function. With builtins on, GCC narrows (float) floor ((double) x) back
+into floorf (x), so floorf, ceilf and sqrtf called themselves until the
+stack ran out (WarMUX's Play hung in sqrtf, 25 Nov 2026). Built with
+-fno-builtin they call floor, ceil and sqrt.
+
+Team 2
+---
+ libstdc++-v3/src/c++98/Makefile.am | 9 +++++++++
+ libstdc++-v3/src/c++98/Makefile.in | 9 +++++++++
+ 2 files changed, 18 insertions(+)
+
+diff --git a/libstdc++-v3/src/c++98/Makefile.am b/libstdc++-v3/src/c++98/Makefile.am
+index e816356..5ae6f81 100644
+--- a/libstdc++-v3/src/c++98/Makefile.am
++++ b/libstdc++-v3/src/c++98/Makefile.am
+@@ -185,6 +185,15 @@ strstream.lo: strstream.cc
+ strstream.o: strstream.cc
+ 	$(CXXCOMPILE) -I$(GLIBCXX_INCLUDE_DIR)/backward -Wno-deprecated -c $<
+ 
++# The float stubs (built where configure finds no floorf, ceilf, sqrtf...
++# in the C library, as on AmigaOS with libnix) call the double functions:
++# with builtins on, GCC narrows (float) floor (x) back into floorf (x), and
++# floorf, ceilf and sqrtf call themselves until the stack runs out.
++math_stubs_float.lo: math_stubs_float.cc
++	$(LTCXXCOMPILE) -fno-builtin -c $<
++math_stubs_float.o: math_stubs_float.cc
++	$(CXXCOMPILE) -fno-builtin -c $<
++
+ # Use special rules for the concept-checking instantiations so that all
+ # the generated template functions are also instantiated.  Force the checks
+ # to be on so that the instantiations are actually seen.
+diff --git a/libstdc++-v3/src/c++98/Makefile.in b/libstdc++-v3/src/c++98/Makefile.in
+index 1a3ab12..8065639 100644
+--- a/libstdc++-v3/src/c++98/Makefile.in
++++ b/libstdc++-v3/src/c++98/Makefile.in
+@@ -902,6 +902,15 @@ strstream.lo: strstream.cc
+ strstream.o: strstream.cc
+ 	$(CXXCOMPILE) -I$(GLIBCXX_INCLUDE_DIR)/backward -Wno-deprecated -c $<
+ 
++# The float stubs (built where configure finds no floorf, ceilf, sqrtf...
++# in the C library, as on AmigaOS with libnix) call the double functions:
++# with builtins on, GCC narrows (float) floor (x) back into floorf (x), and
++# floorf, ceilf and sqrtf call themselves until the stack runs out.
++math_stubs_float.lo: math_stubs_float.cc
++	$(LTCXXCOMPILE) -fno-builtin -c $<
++math_stubs_float.o: math_stubs_float.cc
++	$(CXXCOMPILE) -fno-builtin -c $<
++
+ # Use special rules for the concept-checking instantiations so that all
+ # the generated template functions are also instantiated.  Force the checks
+ # to be on so that the instantiations are actually seen.
