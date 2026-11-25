@@ -35,3 +35,4 @@ gcc       gcc/0019-fold-mem-offsets-a-memory-to-memory-move-is-no-root.patch
 # not: 0016-amigaos-stack-protector-runtime-and-hardened-diagnos.patch  AmigaOS/libnix driver and runtime integration (m68kamigaos.h); AROS needs its own libc/sysroot assessment
 # not: 0017-amigaos-allow-ubsan-trap-mode.patch  Removes the AmigaOS-only sanitizer prohibition in amigaos.h; stock AROS does not use that header
 # not: 0018-amigaos-build-dedicated-m68040-multilibs.patch  AmigaOS hunk/libnix multilib layout; AROS already has a distinct m68040 multilib
+# not: 0020-libstdc-build-the-float-math-stubs-with-fno-builtin.patch  only where the C library has no floorf, ceilf or sqrtf (libnix); AROS's libstdc has them, so its libstdc++ builds no float stubs (the aros68k-gcc16-open9 stove's has none)
