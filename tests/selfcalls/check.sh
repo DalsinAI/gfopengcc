@@ -13,7 +13,7 @@ CXX=$PREFIX/bin/m68k-amigaos-g++
 T=$(mktemp -d); trap 'rm -rf "$T"' EXIT
 python3 "$HERE/test_check_selfcalls.py"
 for fl in "-m68040" "-m68040 -m68881" "-m68020"; do
-  "$CXX" $fl -O2 -fno-builtin -noixemul -o "$T/floatmath" "$HERE/floatmath.cpp" -lm
+  "$CXX" $fl -O2 -fno-builtin -noixemul -o "$T/floatmath" "$HERE/floatmath.cpp" -lm -lpthread -latomic
   python3 "$HERE/check_selfcalls.py" "$T/floatmath" || { echo "selfcalls ($fl): a function the stove links calls itself"; exit 1; }
 done
 echo "selfcalls: no float function a g++ link takes calls itself"
