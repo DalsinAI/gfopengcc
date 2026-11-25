@@ -26,7 +26,7 @@ fi
 mkdir -p "$TMPDIR"; TMPDIR=$(cd "$TMPDIR" && pwd); export TMPDIR
 A=$WORK/aros; S=$A/src; B=$A/build; LOGS=$A/logs; mkdir -p "$LOGS"
 # The identity scripts/build.sh gives the m68k-amigaos GCC (tests/release-names.sh keeps them in step).
-ID="GFOpenAmigaGCC 16.2.0-open9"
+ID="GFOpenAmigaGCC 16.2.0-open10"
 T=m68k-aros
 say() { echo "== $*"; }
 if [ "$SYSROOT" = none ]; then

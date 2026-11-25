@@ -30,7 +30,7 @@ case $ARCH in
 esac
 A=$WORK/linux; S=$A/src-$ARCH; B=$A/build-$ARCH; LOGS=$A/logs-$ARCH; mkdir -p "$LOGS"
 # The identity scripts/build.sh gives the m68k-amigaos GCC (tests/release-names.sh keeps them in step).
-ID="GFOpenAmigaGCC 16.2.0-open9"
+ID="GFOpenAmigaGCC 16.2.0-open10"
 say() { echo "== $*"; }
 NOFETCH=""
 if unshare -n --map-current-user true 2>/dev/null; then NOFETCH="unshare -n --map-current-user"; fi

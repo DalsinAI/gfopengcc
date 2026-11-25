@@ -17,6 +17,8 @@ It builds on bebbo's amiga-gcc line (GCC for `m68k-amigaos` with libnix) and add
 
 ## Status
 
+**16.2.0-open10** ([notes](docs/releases/16.2.0-open10.md)): open9 with two fixes: GCC 0020, libstdc++'s `floorf`, `ceilf` and `sqrtf` no longer call themselves (they hung any g++ program that used them; `tests/selfcalls` checks it); and aros-stuff 0012, the pthreads fallback signals are cleared before a wait (GF-99).
+
 **16.2.0-open9** ([notes](docs/releases/16.2.0-open9.md)): open8 with two fixes: aros-stuff 0011, every `pthread_cond_signal` wakes a thread that is still waiting; and libstdc++'s `std::stoll`, `std::stoull` and `std::stold` for `std::string` (#51). Published first as a release candidate (pre-release `v16.2.0-open9-rc1`).
 
 **Next: 16.2.0-open6** ([notes](docs/releases/16.2.0-open6.md), the first release published since open4): one compiler for both 68k targets. `m68k-aros` joins `m68k-amigaos`: stock GCC 16.2.0 with AROS's diffs and the m68k fixes below (GCC 0003, 0005, 0008, 0013, 0014), so AROS code and GFOpenKick's exec get the late-combine fix (PR123853) too ([docs/aros.md](docs/aros.md)). The `m68k-amigaos` compiler is open5's but for its identity, `GFOpenAmigaGCC 16.2.0-open6`, which both targets carry.
